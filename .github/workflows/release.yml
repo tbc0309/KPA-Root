@@ -1,0 +1,62 @@
+name: Release KPA Root
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, for example v1.0.1
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: root-release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate scripts
+        shell: powershell
+        run: |
+          ./Test-Monitor.ps1
+          ./Test-Magisk.ps1
+      - name: Select tag
+        id: select
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            "tag=${{ inputs.tag }}" >> $env:GITHUB_OUTPUT
+          } else {
+            "tag=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
+          }
+      - name: Fetch latest independent module releases
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./scripts/Fetch-Modules.ps1
+      - name: Build Root package
+        shell: pwsh
+        run: ./build-release.ps1 -Version ('${{ steps.select.outputs.tag }}' -replace '^v','') -SkipModuleDownload
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.select.outputs.tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $Asset = (Get-ChildItem ./dist/*.zip).FullName
+          gh release view $env:RELEASE_TAG --json tagName *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:RELEASE_TAG $Asset --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'Release asset upload failed.' }
+            gh release edit $env:RELEASE_TAG --notes-file RELEASE_NOTES.md --title "KPA Root $env:RELEASE_TAG"
+          } else {
+            gh release create $env:RELEASE_TAG $Asset --verify-tag --notes-file RELEASE_NOTES.md --title "KPA Root $env:RELEASE_TAG"
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
