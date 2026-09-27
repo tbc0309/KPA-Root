@@ -44,9 +44,9 @@ Run `2_Root_EN.cmd`.
 
 Check the firmware version again before flashing. The 0730 and 0813 images have not been tested on hardware and are not guaranteed to boot or recover correctly.
 
-The script always reuses and verifies an existing image first. Only when the current firmware image is missing, it uses the connected handheld's own SN to query and download official adjacent incremental OTAs, reconstructs the current stock boot from an earlier stock boot, and patches it with the bundled Magisk 30.7. After preflight and user confirmation, it flashes only the active slot, installs Magisk, enables Zygisk and verifies Root.
+The script always reuses and verifies an existing image first. Only when the current firmware image is missing, it queries and downloads official adjacent incremental OTAs, reconstructs the current stock boot from an earlier stock boot, and patches it with the bundled Magisk 30.7. After preflight and user confirmation, it flashes only the active slot, installs Magisk, enables Zygisk and verifies Root.
 
-Automatic generation requires Internet access, a complete official incremental chain and a working ADB connection. OTA archives retain their server filenames under `ota-cache`; the SN is sent only to the official OTA service. Existing 0730, 0813 and 0828 images are never regenerated or overwritten.
+Automatic generation requires Internet access, a complete official incremental chain and a working ADB connection. OTA archives retain their server filenames under `ota-cache`. Existing 0730, 0813 and 0828 images are never regenerated or overwritten.
 
 > [!WARNING]
 > Successful reconstruction and file verification do not mean that Root has been tested on a new firmware. A later build may change the boot chain and fail to start. Verify the version and accept the risk before flashing.

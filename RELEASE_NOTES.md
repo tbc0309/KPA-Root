@@ -1,6 +1,6 @@
 ## 中文
 
-新增缺失 boot 自动生成：使用已连接掌机自身 SN 查询官方 OTA，从已有原版 boot 沿相邻增量链合成当前版本原版 boot，并用 Magisk 30.7 自动修补。已有镜像始终优先复用且不会覆盖，下载保留服务器原始文件名。
+新增缺失 boot 自动生成：从官方 OTA 相邻增量链合成当前版本原版 boot，并用 Magisk 30.7 自动修补。已有镜像始终优先复用且不会覆盖，下载保留服务器原始文件名。
 
 提供中文、英文解锁、Root 和恢复脚本。内置 Magisk 及五个默认停用的模块。
 
@@ -8,7 +8,7 @@
 
 ## English
 
-Added automatic generation for a missing boot image. The toolkit uses the connected handheld's own SN to query official OTA updates, reconstructs the current stock boot through adjacent incremental packages, and patches it with Magisk 30.7. Existing images are always reused and never overwritten; downloads retain their server filenames.
+Added automatic generation for a missing boot image. The toolkit reconstructs the current stock boot through official adjacent incremental OTA packages and patches it with Magisk 30.7. Existing images are always reused and never overwritten; downloads retain their server filenames.
 
 Includes Chinese and English unlock, Root and restore scripts, Magisk, and five modules installed disabled by default.
 

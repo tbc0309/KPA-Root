@@ -90,7 +90,7 @@ function Ensure-KpaStockBoot {
         if($Known -and $Hash -ine $Known.Hash){throw "Existing stock boot SHA256 mismatch: $TargetFile"}
         return [pscustomobject]@{Path=$TargetFile;Hash=$Hash;Version=$TargetShort;Generated=$false}
     }
-    if($Serial -notmatch '^BW03[A-Z0-9]+$'){throw 'Connected device serial is not a valid KONKR Pocket Advance SN.'}
+    if($Serial -notmatch '^BW03[A-Z0-9]+$'){throw 'Connected device identity is invalid.'}
     $Dumper=Join-Path $RootDir 'tools\payload_dumper.exe'
     if(-not(Test-Path $Dumper)){throw 'payload_dumper.exe is missing.'}
     if((Get-FileHash $Dumper -Algorithm SHA256).Hash -ine $script:KpaPayloadDumperHash){throw 'payload_dumper.exe SHA256 mismatch.'}
@@ -99,7 +99,7 @@ function Ensure-KpaStockBoot {
     $CurrentDate=[string]$Source.Date; $CurrentShort=[string]$Source.Short; $CurrentServer=[string]$Source.Server; $CurrentBoot=Join-Path $RootDir "boot_${CurrentShort}_stock.img"
     if((Get-Item $CurrentBoot).Length -ne 33554432 -or (Get-FileHash $CurrentBoot -Algorithm SHA256).Hash -ine [string]$Source.Hash){throw "Source stock boot verification failed: $CurrentBoot"}
     $Cache=Join-Path $RootDir 'ota-cache'; New-Item -ItemType Directory -Force -Path $Cache|Out-Null
-    Write-Host ((Get-KpaText 'Missing stock boot; querying official OTA with device SN: ' '缺少原版 boot，正在使用设备 SN 查询官方 OTA：')+$Serial) -ForegroundColor Yellow
+    Write-Host (Get-KpaText 'Missing stock boot; querying the official OTA chain.' '缺少原版 boot，正在查询官方 OTA 增量链。') -ForegroundColor Yellow
     for($Step=0;$Step -lt 12 -and $CurrentDate -lt $TargetDate;$Step++){
         $Offer=Get-KpaOtaOffer $CurrentServer $Serial
         if(-not $Offer){throw "No official incremental OTA was returned for $CurrentServer"}

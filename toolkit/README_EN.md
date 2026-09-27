@@ -33,7 +33,7 @@ Already-unlocked devices exit immediately. Enter `CONTINUE` to enter Bootloader,
 
 Run `2_Root_EN.cmd`. The script detects the current firmware, verifies and reuses an existing image first, and flashes only the active slot.
 
-When an image is missing, the script uses the connected handheld's own SN to query the official OTA service, preserves the server filename under `ota-cache`, applies each adjacent incremental OTA to an earlier stock boot, and creates both the current stock boot and a Magisk 30.7 patched boot. It stops without flashing if a continuous official chain is unavailable. Existing images are never overwritten; the SN is sent only to the official OTA service.
+When an image is missing, the script queries the official OTA service, preserves the server filename under `ota-cache`, applies each adjacent incremental OTA to an earlier stock boot, and creates both the current stock boot and a Magisk 30.7 patched boot. It stops without flashing if a continuous official chain is unavailable. Existing images are never overwritten.
 
 An automatically generated new version has not been tested on hardware. Successful reconstruction and verification do not eliminate the risk of a boot-chain change or boot failure.
 
