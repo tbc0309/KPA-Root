@@ -17,7 +17,7 @@ Chinese and English documentation and launchers are available.
 
 - Model: `GT78-VN`
 - Board: `k85v1_64`
-- Firmware: `BW03_20260730`, `BW03_20260813`, `BW03_20260828`
+- Firmware: bundled for `BW03_20260730`, `BW03_20260813` and `BW03_20260828`; boot images can be generated for later official incremental builds
 - Root: Magisk 30.7 with Zygisk
 - Host: Windows; ADB and Fastboot are included
 
@@ -44,7 +44,12 @@ Run `2_Root_EN.cmd`.
 
 Check the firmware version again before flashing. The 0730 and 0813 images have not been tested on hardware and are not guaranteed to boot or recover correctly.
 
-The script matches the 0730, 0813 or 0828 Magisk boot, flashes only the active slot, installs Magisk, enables Zygisk and verifies Root.
+The script always reuses and verifies an existing image first. Only when the current firmware image is missing, it uses the connected handheld's own SN to query and download official adjacent incremental OTAs, reconstructs the current stock boot from an earlier stock boot, and patches it with the bundled Magisk 30.7. After preflight and user confirmation, it flashes only the active slot, installs Magisk, enables Zygisk and verifies Root.
+
+Automatic generation requires Internet access, a complete official incremental chain and a working ADB connection. OTA archives retain their server filenames under `ota-cache`; the SN is sent only to the official OTA service. Existing 0730, 0813 and 0828 images are never regenerated or overwritten.
+
+> [!WARNING]
+> Successful reconstruction and file verification do not mean that Root has been tested on a new firmware. A later build may change the boot chain and fail to start. Verify the version and accept the risk before flashing.
 
 The package also includes:
 

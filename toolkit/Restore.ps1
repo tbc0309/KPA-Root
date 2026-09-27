@@ -2,6 +2,7 @@
 param([ValidateSet('CN','EN')][string]$Language = 'CN', [switch]$PreflightOnly)
 
 . (Join-Path $PSScriptRoot 'KPA.Common.ps1')
+. (Join-Path $PSScriptRoot 'KPA.OtaBoot.ps1')
 
 $ErrorActionPreference = 'Stop'
 $RootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -22,8 +23,8 @@ try {
 
     Initialize-KpaUsbEnvironment -Adb $Adb -Fastboot $Fastboot | Out-Null
 
-    $Model = (& $Adb shell getprop ro.product.model).Trim()
-    $Device = (& $Adb shell getprop ro.product.device).Trim()
+    $Model = (& $Adb shell getprop ro.product.bootimage.model).Trim()
+    $Device = (& $Adb shell getprop ro.product.bootimage.device).Trim()
     $Board = (& $Adb shell getprop ro.product.board).Trim()
     $Build = (& $Adb shell getprop ro.build.display.id).Trim()
     $Incremental = (& $Adb shell getprop ro.build.version.incremental).Trim()
@@ -102,17 +103,8 @@ try {
     }
 
     if ($RestoreBoot) {
-    if ($Build -match '^BW03_20260730(?:_|$)') {
-        $Version='0730'; $StockBoot=Join-Path $RootDir 'boot_0730_stock.img'; $ExpectedHash='735E1D3855DC0165762006CDCB1136D3047B8E999A559FBD259B2ADB58A32487'
-    } elseif ($Build -match '^BW03_20260813(?:_|$)') {
-        $Version='0813'; $StockBoot=Join-Path $RootDir 'boot_0813_stock.img'; $ExpectedHash='66919AA93F4D1CE9055F2F08B20034E031E63444C2B77E0D2FA3EB186817A71A'
-    } elseif ($Build -match '^BW03_20260828(?:_|$)') {
-        $Version='0828'; $StockBoot=Join-Path $RootDir 'boot_0828_stock.img'; $ExpectedHash='F25E0D5115E4E382983F9ACB47B3A2B8AEFB8C8C866D5A07BB888E48553D4039'
-    } else {
-        throw "Unsupported firmware / 不支持的固件：$Build"
-    }
-    if (-not (Test-Path -LiteralPath $StockBoot -PathType Leaf)) { throw "Stock boot missing / 缺少原版镜像：$StockBoot" }
-    if ((Get-FileHash -Algorithm SHA256 -LiteralPath $StockBoot).Hash -ne $ExpectedHash) { throw 'Stock boot hash mismatch / 原版镜像哈希不匹配。' }
+    $StockInfo=Ensure-KpaStockBoot -RootDir $RootDir -Build $Build -Serial $Serial
+    $Version=$StockInfo.Version; $StockBoot=$StockInfo.Path; $ExpectedHash=$StockInfo.Hash
     }
     Write-KpaSection 'Android preflight' 'Android 预检'
     Write-KpaStatus 'ADB serial' '设备序列号' ("$Serial") Gray

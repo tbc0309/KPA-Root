@@ -1,4 +1,6 @@
 /dist/
 /toolkit/modules/*.zip
 /toolkit/*_Log_*.txt
-
+/toolkit/ota-cache/
+/toolkit/generated-stock-boots.json
+/toolkit/generated-patched-boots.json

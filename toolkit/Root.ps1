@@ -3,6 +3,7 @@ param([ValidateSet('CN','EN')][string]$Language = 'CN', [switch]$PreflightOnly)
 
 . (Join-Path $PSScriptRoot 'KPA.Common.ps1')
 . (Join-Path $PSScriptRoot 'KPA.Magisk.ps1')
+. (Join-Path $PSScriptRoot 'KPA.OtaBoot.ps1')
 $script:KpaManagerRepairUsed = $false
 
 $ErrorActionPreference = 'Stop'
@@ -46,7 +47,7 @@ function Install-BundledModulesDisabled {
 
 Start-Transcript -LiteralPath $Log | Out-Null
 try {
-    Write-KpaBanner 'KONKR Pocket Advance - Root (0730 / 0813 / 0828)' 'KONKR Pocket Advance - 获取 Root（0730 / 0813 / 0828）'
+    Write-KpaBanner 'KONKR Pocket Advance - Root' 'KONKR Pocket Advance - 获取 Root'
     Write-Host 'Bootloader must already be unlocked / Bootloader 必须已经解锁。'
     Write-Host 'Only the active boot slot is flashed / 只刷当前活动槽，不改另一槽。' -ForegroundColor Yellow
     Write-Host 'Before every OTA, restore the matching stock boot / 每次 OTA 前必须恢复匹配的原版 boot。' -ForegroundColor Red
@@ -60,8 +61,8 @@ try {
 
     Initialize-KpaUsbEnvironment -Adb $Adb -Fastboot $Fastboot | Out-Null
 
-    $Model = (& $Adb shell getprop ro.product.model).Trim()
-    $Device = (& $Adb shell getprop ro.product.device).Trim()
+    $Model = (& $Adb shell getprop ro.product.bootimage.model).Trim()
+    $Device = (& $Adb shell getprop ro.product.bootimage.device).Trim()
     $Board = (& $Adb shell getprop ro.product.board).Trim()
     $Build = (& $Adb shell getprop ro.build.display.id).Trim()
     $Incremental = (& $Adb shell getprop ro.build.version.incremental).Trim()
@@ -103,29 +104,31 @@ try {
     if ($Model -ne 'GT78-VN' -or $Device -ne 'GT78-VN' -or $Board -ne 'k85v1_64') {
         throw 'Unsupported hardware / 设备型号不匹配。'
     }
-    if ($Build -match '^BW03_20260730(?:_|$)') {
-        $FirmwareVersion = '0730'
-        $PatchedBoot = Join-Path $RootDir 'boot_0730_magisk_30.7.img'
-        $ExpectedBootHash = 'B77034ED82094F73A5DB0A76870A6905399EA49934FAC05838D874019E748994'
+    if ($Build -notmatch '^BW03_(\d{8})(?:_|$)') {
+        throw (Get-KpaText "Unsupported firmware identifier: $Build." "无法识别固件版本：$Build。")
     }
-    elseif ($Build -match '^BW03_20260813(?:_|$)') {
-        $FirmwareVersion = '0813'
-        $PatchedBoot = Join-Path $RootDir 'boot_0813_magisk_30.7.img'
-        $ExpectedBootHash = '4836B595C78F52A63EAA05FB0B4A7F344B609E6A7013740CC477778E729F636A'
-    }
-    elseif ($Build -match '^BW03_20260828(?:_|$)') {
-        $FirmwareVersion = '0828'
-        $PatchedBoot = Join-Path $RootDir 'boot_0828_magisk_30.7.img'
-        $ExpectedBootHash = 'BB98AC02CEBE9CC7B3FD070660D76A5B57AF03BF24A8758E8FE63E61408149F1'
-    }
-    else {
-        throw (Get-KpaText "Unsupported firmware: $Build. Supported: 0730, 0813, 0828." "不支持的固件：$Build。支持：0730、0813、0828。")
+    $FirmwareDate = $Matches[1]
+    $FirmwareVersion = $FirmwareDate.Substring(4)
+    $PatchedBoot = Join-Path $RootDir "boot_${FirmwareVersion}_magisk_30.7.img"
+    $KnownPatchedHashes = @{
+        '0730' = 'B77034ED82094F73A5DB0A76870A6905399EA49934FAC05838D874019E748994'
+        '0813' = '4836B595C78F52A63EAA05FB0B4A7F344B609E6A7013740CC477778E729F636A'
+        '0828' = 'BB98AC02CEBE9CC7B3FD070660D76A5B57AF03BF24A8758E8FE63E61408149F1'
     }
     if (-not (Test-Path -LiteralPath $PatchedBoot -PathType Leaf)) {
-        throw "Required boot image missing / 缺少 boot 镜像：$PatchedBoot"
+        Write-KpaSection 'Prepare missing boot image' '准备缺少的 boot 镜像'
+        $StockInfo = Ensure-KpaStockBoot -RootDir $RootDir -Build $Build -Serial $Serial
+        $PatchedBoot = Ensure-KpaPatchedBoot -RootDir $RootDir -Stock $StockInfo -Adb $Adb
     }
-    if ((Get-FileHash -Algorithm SHA256 -LiteralPath $PatchedBoot).Hash -ne $ExpectedBootHash) {
+    $ExpectedBootHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $PatchedBoot).Hash
+    if ($KnownPatchedHashes.ContainsKey($FirmwareVersion) -and $ExpectedBootHash -ne $KnownPatchedHashes[$FirmwareVersion]) {
         throw "Patched boot SHA256 mismatch / $FirmwareVersion 修补镜像哈希不匹配。"
+    }
+    if (-not $KnownPatchedHashes.ContainsKey($FirmwareVersion)) {
+        $RecordedPatchedHash = Get-KpaRecordedPatchedHash -RootDir $RootDir -Version $FirmwareVersion
+        if (-not $RecordedPatchedHash -or $ExpectedBootHash -ne $RecordedPatchedHash) {
+            throw "Generated patched boot is not verified / $FirmwareVersion 自动修补镜像缺少有效校验记录。"
+        }
     }
     if ($Slot -notin @('a','b')) { throw "Unable to determine active slot / 无法识别活动槽：$Slot" }
 

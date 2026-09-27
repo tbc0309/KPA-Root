@@ -39,6 +39,9 @@ foreach ($File in $Files) {
     $Tokens = $null
     $Errors = $null
     [void][Management.Automation.Language.Parser]::ParseFile($File.FullName, [ref]$Tokens, [ref]$Errors)
-    if ($Errors.Count) { throw ($Errors | Out-String) }
+    if ($Errors.Count) {
+        $Details = @($Errors | ForEach-Object { "line $($_.Extent.StartLineNumber): $($_.Message) [$($_.Extent.Text)]" }) -join "`n"
+        throw "Parser errors in $($File.Name):`n$Details"
+    }
 }
 Write-Output 'PASS: PowerShell parsing'

@@ -1,15 +1,15 @@
 ## 中文
 
-更新内置 KPA MYuppy Font 至 1.0.1，新增安装时字体模块冲突检测。Root 和恢复流程保持不变。
+新增缺失 boot 自动生成：使用已连接掌机自身 SN 查询官方 OTA，从已有原版 boot 沿相邻增量链合成当前版本原版 boot，并用 Magisk 30.7 自动修补。已有镜像始终优先复用且不会覆盖，下载保留服务器原始文件名。
 
-提供中文、英文解锁、Root 和恢复脚本。内置 Magisk 及五个模块，模块默认停用。Dolby 版本修复了横屏图形均衡器显示；使用前请在“设置 → 声音 → 音效改善”开启 BesLoudness。
+提供中文、英文解锁、Root 和恢复脚本。内置 Magisk 及五个默认停用的模块。
 
-**仅 0828 经过实机测试；0730、0813 未验证。刷写可能导致数据丢失、无法启动或设备损坏。不建议重新锁定 Bootloader；恢复 boot 不等于恢复所有原版分区。**
+**仅 0828 经过 Root 实机测试；0730、0813 及自动生成的后续版本未验证。自动合成成功不代表刷写安全。刷写可能导致数据丢失、无法启动或设备损坏。不建议重新锁定 Bootloader。**
 
 ## English
 
-Updated bundled KPA MYuppy Font to 1.0.1 with installation-time font module conflict detection. Root and restore procedures are unchanged.
+Added automatic generation for a missing boot image. The toolkit uses the connected handheld's own SN to query official OTA updates, reconstructs the current stock boot through adjacent incremental packages, and patches it with Magisk 30.7. Existing images are always reused and never overwritten; downloads retain their server filenames.
 
-Includes Chinese and English unlock, Root and restore scripts, Magisk, and five modules installed disabled by default. The Dolby build fixes the graphical equalizer display in landscape. Before use, enable BesLoudness in Settings → Sound → Sound enhancement.
+Includes Chinese and English unlock, Root and restore scripts, Magisk, and five modules installed disabled by default.
 
-**Only 0828 has been tested on hardware; 0730 and 0813 are unverified. Flashing may cause data loss, boot failure or device damage. Bootloader relocking is not recommended; restoring boot does not restore all stock partitions.**
+**Only 0828 Root has been tested on hardware. 0730, 0813 and automatically generated later builds are unverified. Successful reconstruction does not make flashing safe. Flashing may cause data loss, boot failure or device damage. Bootloader relocking is not recommended.**

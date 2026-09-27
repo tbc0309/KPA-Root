@@ -1,0 +1,5 @@
+payload-dumper 0.8.4
+Copyright (C) 2024-2026 rhythmcache
+Licensed under the Apache License, Version 2.0.
+Project: https://github.com/rhythmcache/payload-dumper-rust
+

@@ -9,7 +9,7 @@
 
 - Model: `GT78-VN`
 - Board: `k85v1_64`
-- Firmware: `BW03_20260730`, `BW03_20260813`, `BW03_20260828`
+- Firmware: bundled for `BW03_20260730`, `BW03_20260813` and `BW03_20260828`; later builds can be generated from a continuous official incremental OTA chain
 - Root solution: Magisk 30.7 with Zygisk
 
 Scripts display device, firmware, lock state and target partition, select the active slot, and verify image hashes. Unsupported devices or mismatched firmware are not flashed.
@@ -31,7 +31,11 @@ Already-unlocked devices exit immediately. Enter `CONTINUE` to enter Bootloader,
 
 ## 2. Obtain Root
 
-Run `2_Root_EN.cmd`. The script detects firmware 0730, 0813 or 0828, verifies the matching image, and flashes only the active slot.
+Run `2_Root_EN.cmd`. The script detects the current firmware, verifies and reuses an existing image first, and flashes only the active slot.
+
+When an image is missing, the script uses the connected handheld's own SN to query the official OTA service, preserves the server filename under `ota-cache`, applies each adjacent incremental OTA to an earlier stock boot, and creates both the current stock boot and a Magisk 30.7 patched boot. It stops without flashing if a continuous official chain is unavailable. Existing images are never overwritten; the SN is sent only to the official OTA service.
+
+An automatically generated new version has not been tested on hardware. Successful reconstruction and verification do not eliminate the risk of a boot-chain change or boot failure.
 
 Check the detected firmware again before flashing. Images are provided for 0730 and 0813, but they have not been validated on physical hardware and are not guaranteed to boot or recover correctly.
 
@@ -71,7 +75,7 @@ Run `3_Restore_EN.cmd` before installing an OTA. The script detects the current 
 
 Restore also writes the boot partition. The 0730 and 0813 restore paths have not been tested on hardware; selecting the wrong version or a faulty image may prevent the device from booting.
 
-Confirm that Android boots normally before checking for and installing the OTA. After the OTA boots successfully from its new slot, extract and patch the new firmware's boot image before restoring Root.
+Confirm that Android boots normally before checking for and installing the OTA. After the OTA boots successfully from its new slot, run the Root script again; it can reconstruct and patch a missing image for the new firmware.
 
 Restore menu:
 

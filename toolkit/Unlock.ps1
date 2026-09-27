@@ -22,8 +22,8 @@ try {
 
     Initialize-KpaUsbEnvironment -Adb $Adb -Fastboot $Fastboot | Out-Null
 
-    $Model = (& $Adb shell getprop ro.product.model).Trim()
-    $Device = (& $Adb shell getprop ro.product.device).Trim()
+    $Model = (& $Adb shell getprop ro.product.bootimage.model).Trim()
+    $Device = (& $Adb shell getprop ro.product.bootimage.device).Trim()
     $Board = (& $Adb shell getprop ro.product.board).Trim()
     $Build = (& $Adb shell getprop ro.build.display.id).Trim()
     $Incremental = (& $Adb shell getprop ro.build.version.incremental).Trim()
