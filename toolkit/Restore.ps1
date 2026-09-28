@@ -19,7 +19,12 @@ function Get-FastbootVar([string]$Name) {
 Start-Transcript -LiteralPath $Log | Out-Null
 try {
     Write-KpaBanner 'KONKR Pocket Advance - Restore / Relock' 'KONKR Pocket Advance - 恢复 / 加锁'
-    Write-Host 'Restore stock boot before OTA. Relocking is optional. ||| OTA 前恢复原版 boot；加锁为独立可选操作。' -ForegroundColor Yellow
+    Write-KpaSection 'Choose this script for OTA preparation' '使用本脚本准备 OTA'
+    Write-KpaStep 1 3 'Verify the current firmware, active slot, and stock boot image' '核对当前固件、活动槽与原版 boot 镜像'
+    Write-KpaStep 2 3 'Restore stock boot to the active slot after explicit confirmation' '明确确认后，将原版 boot 恢复到当前活动槽'
+    Write-KpaStep 3 3 'Restart Android; install the official OTA, then run the Root script again' '重启 Android；安装官方 OTA，完成后再次运行 Root 脚本'
+    Write-KpaHint 'Relocking is a separate optional action and is not needed for OTA.' '重新加锁是独立可选操作，OTA 不需要加锁。' DarkGray
+    Write-KpaHint 'KPA Tools Root edition can automate OTA preparation and post-update Root patching.' 'KPA助手 Root 版可自动完成 OTA 前准备和更新后的 Root 修补。' DarkGray
 
     Initialize-KpaUsbEnvironment -Adb $Adb -Fastboot $Fastboot | Out-Null
 
@@ -33,19 +38,20 @@ try {
     $Slot = (& $Adb shell getprop ro.boot.slot_suffix).Trim().TrimStart('_')
     $Serial = (& $Adb get-serialno).Trim()
     $BootState = (& $Adb shell getprop ro.boot.verifiedbootstate).Trim()
-    $FlashLocked = (& $Adb shell getprop ro.boot.flash.locked).Trim()
+    $FlashLocked = Get-KpaBootLock
     if ($Model -ne 'GT78-VN' -or $Device -ne 'GT78-VN' -or $Board -ne 'k85v1_64') { throw 'Unsupported hardware / 设备型号不匹配。' }
     if ($Slot -notin @('a','b')) { throw "Unable to determine active slot / 无法识别活动槽：$Slot" }
 
     Write-KpaSection 'Current device state' '当前设备状态'
     Write-KpaStatus 'Build' '系统版本' $Build Green
     Write-KpaStatus 'Active slot' '活动槽' $Slot Yellow
-    if ($FlashLocked -eq '1') {
-        Write-Host 'Bootloader already locked. Exiting. ||| Bootloader 已加锁，退出。' -ForegroundColor Green
-        exit 0
+    if ($FlashLocked -eq '0') {
+        Write-KpaStatus 'Android lock report' 'Android 锁状态' (Get-KpaText 'Unlocked' '已解锁') Yellow
+    } elseif ($FlashLocked -eq '1') {
+        Write-KpaStatus 'Android lock report' 'Android 锁状态' (Get-KpaText 'Locked; Fastboot verification required' '已锁定；仍需 Fastboot 确认') Yellow
+    } else {
+        Write-KpaStatus 'Android lock report' 'Android 锁状态' (Get-KpaText 'Unknown; Fastboot verification required' '未知；仍需 Fastboot 确认') Yellow
     }
-    if ($FlashLocked -ne '0') { throw (Get-KpaText 'Unknown lock state; stopping.' '无法确认锁状态，已停止。') }
-    Write-KpaStatus 'Bootloader' 'Bootloader' (Get-KpaText 'Unlocked' '已解锁') Yellow
 
     # Lack of su does not establish whether the on-disk boot image is stock.
     $StockHashes = @{
@@ -95,11 +101,6 @@ try {
             Write-Host 'Stock boot already present. Exiting. Use option 2 to relock. ||| 已是原版 boot，退出。如需加锁，选择选项 2。' -ForegroundColor Green
             exit 0
         }
-        if ($FlashLocked -eq '1') {
-            Write-Host 'Bootloader is already locked. No change made. ||| Bootloader 已加锁，未执行任何修改。' -ForegroundColor Green
-            exit 0
-        }
-        if ($FlashLocked -ne '0') { throw (Get-KpaText 'Unknown lock state.' '锁状态不明，已停止。') }
     }
 
     if ($RestoreBoot) {
@@ -121,7 +122,9 @@ try {
     Write-KpaStatus 'Firmware' '固件匹配' ("$Version") Green
     Write-KpaStatus 'Image' '原版镜像' ("$(Split-Path -Leaf $StockBoot)") Yellow
     Write-KpaStatus 'Image size' '镜像大小' ("$((Get-Item -LiteralPath $StockBoot).Length) bytes") Gray
-    Write-Host "SHA256                 : $ExpectedHash" -ForegroundColor Green
+    Write-KpaStatus 'SHA256' 'SHA256 校验' (Get-KpaText 'Passed' '通过') Green
+    Write-Host ('  ' + $ExpectedHash.Substring(0, 32)) -ForegroundColor DarkGray
+    Write-Host ('  ' + $ExpectedHash.Substring(32)) -ForegroundColor DarkGray
     Write-KpaStatus 'Target' '目标分区' ("boot_$Slot") Yellow
     }
 
@@ -131,8 +134,7 @@ try {
         exit 0
     }
 
-    $Continue = Read-Host 'Type CONTINUE to enter Bootloader; anything else cancels ||| 输入 CONTINUE 进入 Bootloader，其他输入取消'
-    if ($Continue -cne 'CONTINUE') { exit 0 }
+    if (-not (Read-KpaYes 'Enter Bootloader?' '进入 Bootloader？')) { exit 0 }
     & $Adb reboot bootloader
 
     if ($LASTEXITCODE -ne 0) { throw (Get-KpaText 'Failed to enter Bootloader.' '无法进入 Bootloader，已停止。') }
@@ -156,8 +158,7 @@ try {
     if ($RestoreBoot) {
     Write-KpaStatus 'Final target' '最终目标' ("boot_$Slot") Yellow
     Write-Host 'This removes Root from the active slot / 这会移除活动槽上的 Root。' -ForegroundColor Red
-    $Confirm = Read-Host 'Type RESTORE to continue / 输入 RESTORE 继续'
-    if ($Confirm -cne 'RESTORE') {
+    if (-not (Read-KpaYes 'Restore the verified stock boot?' '恢复已验证的原版 boot？')) {
         & $Fastboot -s $script:KpaSerial reboot | Out-Null
         throw 'Cancelled safely; rebooting Android / 已安全取消，正在重启 Android。'
     }
@@ -176,15 +177,15 @@ try {
         Write-Host 'Stock boot has NOT been restored in this run. Root/patched or mismatched partitions can prevent boot after locking. ||| 本次未恢复原版 boot。若仍有 Root 修补或不匹配分区，加锁后可能无法启动。' -ForegroundColor Red
     }
     $DidRelock = $false
-    $RelockChoice = Read-Host 'Relock bootloader now? Type Y for yes; anything else keeps it unlocked / 现在重新锁定？输入 Y 确认，其他输入保持解锁'
-    if ($RelockChoice -ceq 'Y') {
-        $LockConfirm = Read-Host 'Type LOCK-ERASE to confirm ALL partitions are stock and accept immediate data loss ||| 确认所有分区均为原版并接受立即清除数据后，输入 LOCK-ERASE'
-        if ($LockConfirm -ceq 'LOCK-ERASE') {
+    $RelockCommandSent = $false
+    if (Read-KpaYes 'Relock the bootloader now?' '现在重新锁定 Bootloader？') {
+        if (Read-KpaYes 'Confirm that ALL partitions are stock and accept immediate data loss.' '确认所有分区均为原版，并接受立即清除数据。') {
             Write-Host 'If a confirmation appears, press Volume Up / YES (MODE to the right of L2). ||| 如掌机出现确认界面，请按音量+ / YES（L2 右侧的 MODE）。' -ForegroundColor Yellow
             & $Fastboot -s $script:KpaSerial flashing lock
             if ($LASTEXITCODE -ne 0) {
                 throw (Get-KpaText 'Relock command failed or was cancelled.' '加锁命令失败或已取消。')
             } else {
+                $RelockCommandSent = $true
                 Start-Sleep -Seconds 2
                 if (@(& $Fastboot devices).Count -eq 1) {
                     $FinalLockState = Get-FastbootVar 'unlocked'
@@ -195,7 +196,7 @@ try {
                         throw (Get-KpaText 'Bootloader is still unlocked; relock not verified.' 'Bootloader 仍显示解锁，加锁未通过验证。')
                     }
                 } else {
-                    throw (Get-KpaText 'Device disconnected; lock state could not be verified. Check the handheld.' '设备已断开，无法确认锁状态，请检查掌机。')
+                    Write-Host 'The device left Fastboot after accepting the relock command. Complete setup on the handheld; verify the lock state after USB debugging is enabled again. ||| 掌机接受加锁命令后已离开 Fastboot。请完成掌机初始化，重新开启 USB 调试后再核对锁状态。' -ForegroundColor Yellow
                 }
             }
         } else {
@@ -211,6 +212,8 @@ try {
     }
     if ($DidRelock) {
         Write-Host 'Relock verified and reboot requested. Complete setup on the handheld; USB debugging may need to be enabled again. ||| 已确认加锁并发送重启。请在掌机完成初始化，之后可能需要重新开启 USB 调试。' -ForegroundColor Green
+    } elseif ($RelockCommandSent) {
+        Write-Host 'Relock command accepted; final state was not readable because the device restarted. ||| 加锁命令已被接受；掌机重启后暂时无法读取最终锁状态。' -ForegroundColor Yellow
     } else {
         Wait-KpaAndroid
         if ($RestoreBoot) { Write-Host 'Stock boot restored; Android startup verified. Bootloader remains unlocked. ||| 原版 boot 已恢复，Android 启动已确认，Bootloader 保持解锁。' -ForegroundColor Green }

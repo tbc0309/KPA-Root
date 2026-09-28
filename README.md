@@ -6,12 +6,15 @@
 
 提供中文和英文文档及启动脚本。
 
+> [!CAUTION]
+> 本工具支持从官方增量 OTA 自动合成并修补 boot，通常可直接用于后续官方系统版本，无需等待工具包更新。发现新 OTA 时，先运行 `3_Restore_CN.cmd` 恢复当前系统的原版 boot，完成官方 OTA 更新后，再运行 `2_Root_CN.cmd` 为新系统恢复 Root。更推荐配合 **KPA 助手 Root 版**使用：OTA 前在 Root 管理中点击“准备 OTA”，待提示准备完成后正常安装官方 OTA，KPA Root Helper 会自动完成后续 Root 修补与校验。
+
+> [!WARNING]
+> `BW03_20260730` 和 `BW03_20260828` 已完成 KPA-Root 直接刷写验证；同一台实机还连续完成了 `0730 → 0813`、`0813 → 0828` 两次官方 OTA 自动修补闭环。任何 boot 写入仍可能导致无法启动、数据丢失或设备损坏，请自行承担风险。
+
 ![安卓桌面首页](docs/images/kpa-android-home.png)
 
 ![掌机 Magisk 状态](docs/images/kpa-current-screen.png)
-
-> [!WARNING]
-> 目前仅 `BW03_20260828` 在当前这台机器上完成实机测试，`BW03_20260730` 和 `BW03_20260813` 未实机验证。刷写存在无法启动、数据丢失甚至设备损坏的风险，不提供安全保证，请自行承担风险。
 
 ## 支持范围
 
@@ -34,6 +37,8 @@
 
 ### 1. 解锁 Bootloader
 
+掌机操作：进入“设置 → 系统 → 开发者选项”，开启 OEM 解锁和 USB 调试，并授权本电脑。
+
 运行：
 
 - `1_Unlock_CN.cmd`
@@ -46,14 +51,11 @@
 
 - `2_Root_CN.cmd`
 
-刷写前请再次确认固件版本。除 0828 外，0730 和 0813 镜像尚未实机测试，无法保证能够正常启动或恢复。
+刷写前请再次确认固件版本。
 
 脚本优先使用并校验已有镜像。当前固件缺少镜像时，才会查询和下载官方相邻增量 OTA，从已有原版 boot 逐版合成当前版本原版 boot，再用随包 Magisk 30.7 自动修补。完成预检和用户确认后，只刷入当前活动槽；随后安装 Magisk、开启 Zygisk，并验证 Root 状态。
 
 自动生成需要联网、有效的官方连续增量链以及正常的 ADB 连接。OTA 保留服务器原始文件名并缓存在 `ota-cache`。已有 0730、0813、0828 镜像不会被重新生成或覆盖。
-
-> [!WARNING]
-> 自动生成只能证明增量补丁可应用并通过文件校验，不代表新固件已经过 Root 实机验证。后续版本仍可能因启动链变化而无法启动，刷写前必须核对版本并自行承担风险。
 
 工具包同时携带：
 
@@ -81,7 +83,9 @@
 
 - `3_Restore_CN.cmd`
 
-恢复脚本同样会写入 boot 分区。0730 和 0813 的恢复流程尚未实机测试；镜像或版本不匹配可能导致无法启动。
+恢复脚本同样会写入 boot 分区，并与 Root 脚本共用 OTA 合成功能。当前固件缺少原版 boot 时，脚本会从已有的较早原版 boot 和官方相邻增量 OTA 逐版合成当前版本，校验成功后才允许恢复，因此后续正常 OTA 通常不需要重新下载新版 KPA-Root 工具包。
+
+自动合成需要联网、有效的官方连续增量链和正常的 ADB 连接；如果官方更改接口或包格式、增量链不完整，脚本会停止且不会刷写。
 
 脚本恢复当前固件和活动槽对应的原版 boot。完成后可选择是否重新锁定 Bootloader；锁定通常会再次清除数据。
 
@@ -90,16 +94,44 @@
 
 ## OTA 注意事项
 
-安装 OTA 前必须先恢复当前固件对应的原版 boot。OTA 完成并确认新固件版本后，需要使用新版本对应的修补 boot；不要把旧版 boot 刷入新版系统。
+### 仅使用 KPA-Root 脚本
 
-## 官方刷机包
+1. OTA 前运行 `3_Restore_CN.cmd`，恢复当前活动槽对应版本的原版 boot；不需要重新锁定 Bootloader。
+2. 原版系统正常启动后安装官方 OTA。
+3. OTA 完成并首次进入新系统后，运行 `2_Root_CN.cmd`。
+4. 脚本会识别新固件；缺少对应 boot 时，从已有原版 boot 和官方相邻增量 OTA 自动合成，再修补并刷入当前活动槽。
 
-- [官方下载页](https://ayaneo.com.cn/support/download)
+不要把旧版本的修补 boot 刷入新版本系统。
 
-进入页面后依次选择“Android 掌机”→“KONKR Pocket Advance”。
+### 配合 KPA助手 Root 版
+
+建议安装 [KPA助手 Root 版](https://github.com/tbc0309/KPA-Tools/releases/latest)。KPA Root Helper 可在系统更新前恢复活动槽原版 boot，并在官方 OTA 完成后自动备份、修补和校验新槽，同时把旧槽保留为对应版本的原版 boot。系统更新页面显示绿色“可以重启”提醒后才能重启。
+
+![KPA助手 Root 管理](docs/images/kpa-tools-root-manager.png)
+
+| 更新或修补中：不要重启 | 修补完成：可以重启 |
+| --- | --- |
+| ![OTA 更新中提醒](docs/images/kpa-ota-updating.png) | ![OTA 修补完成提醒](docs/images/kpa-ota-ready.png) |
+
+## 官方线刷包
+
+- 中文：[AYANEO 服务支持下载](https://ayaneo.com.cn/support/download)
+- English: [AYANEO Support Download](https://www.ayaneo.com/support/download)
+
+打开下载页即可看到 KONKR Pocket Advance 的线刷工具、教程和 Fastboot ROM。中文页同时列出线刷工具教程与 0730 线刷包；英文页列出 0730 Fastboot ROM。
 
 > [!WARNING]
-> 官网目前提供的包应按卡刷更新包使用，不是经过确认的完整线刷恢复包。卡刷不能保证覆盖所有底层分区，也不一定能把设备恢复到完整原厂状态；设备无法进入系统或 Recovery 时，不应把它当作线刷救砖包使用。
+> 官方下载的是 MTK Fastboot 线刷包，不是 Android 系统内的卡刷 OTA。线刷会改写多个分区并可能清除数据；必须严格使用官网配套工具与教程，刷写期间不要断开 USB。
+
+### 线刷模式提醒
+
+SP Flash Tool 必须选择 **`Firmware Upgrade`**，不要使用 `Download Only`，也不要使用 `Format All + Download`。
+
+![SP Flash Tool Firmware Upgrade](docs/images/sp-flash-tool-firmware-upgrade.png)
+
+官方固件只提供 A 槽启动分区镜像；`Download Only` 不会正确完成这套固件所需的 A/B 槽切换处理，可能保留刷机前的活动槽状态，导致线刷完成后持续进入 Fastboot。遇到此情况应重新选择 **`Firmware Upgrade`** 完整线刷，不把手动切换 A 槽作为正式恢复流程。首次启动可能需要 5～10 分钟，请勿提前强制关机。
+
+线刷后 `misc` 中的 A/B 优先级可能相同。KPA-Root 不依赖该优先级选择刷写槽：脚本先读取 Android 当前实际运行槽，进入 Fastboot 后再核对 `current-slot`，两者一致才允许继续。
 
 ## 构建发布包
 

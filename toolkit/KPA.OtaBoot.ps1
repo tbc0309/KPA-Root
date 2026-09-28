@@ -139,6 +139,7 @@ function Ensure-KpaStockBoot {
 function Ensure-KpaPatchedBoot {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$RootDir,[Parameter(Mandatory)]$Stock,[Parameter(Mandatory)][string]$Adb)
+    if ([string]$Stock.Version -notmatch '^(?:[0-9]{4}|[0-9]{8})$') { throw 'Invalid firmware version identifier.' }
     $Output=Join-Path $RootDir "boot_$($Stock.Version)_magisk_30.7.img"
     if(Test-Path $Output){
         if((Get-Item $Output).Length -ne 33554432){throw "Existing patched boot has invalid size: $Output"}
@@ -147,7 +148,11 @@ function Ensure-KpaPatchedBoot {
         return $Output
     }
     $Apk=Join-Path $RootDir 'Magisk-v30.7.apk'; $Work=Join-Path $RootDir ('ota-cache\magisk_'+$Stock.Version)
-    if(Test-Path $Work){Remove-Item $Work -Recurse -Force};New-Item -ItemType Directory -Force -Path $Work|Out-Null
+    $CacheRoot=[IO.Path]::GetFullPath((Join-Path $RootDir 'ota-cache'))+[IO.Path]::DirectorySeparatorChar
+    $Work=[IO.Path]::GetFullPath($Work)
+    if(-not $Work.StartsWith($CacheRoot,[StringComparison]::OrdinalIgnoreCase)){throw 'Unsafe patch workspace.'}
+    if(Test-Path -LiteralPath $Work){Remove-Item -LiteralPath $Work -Recurse -Force}
+    New-Item -ItemType Directory -Force -Path $Work|Out-Null
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $Zip=[IO.Compression.ZipFile]::OpenRead($Apk)
     try {
@@ -155,14 +160,19 @@ function Ensure-KpaPatchedBoot {
         foreach($Pair in $Map.GetEnumerator()){ $Entry=$Zip.GetEntry($Pair.Key);if(-not $Entry){throw "Missing Magisk component: $($Pair.Key)"};[IO.Compression.ZipFileExtensions]::ExtractToFile($Entry,(Join-Path $Work $Pair.Value),$true) }
     } finally {$Zip.Dispose()}
     Copy-Item $Stock.Path (Join-Path $Work 'boot.img')
+    Copy-Item -LiteralPath (Join-Path $RootDir 'patch_boot.sh') -Destination (Join-Path $Work 'patch_boot.sh')
     & $Adb shell rm -rf /data/local/tmp/kpa-auto-patch|Out-Null
+    if($LASTEXITCODE -ne 0){throw 'Failed to clean the device patch workspace.'}
     & $Adb shell mkdir -p /data/local/tmp/kpa-auto-patch|Out-Null
+    if($LASTEXITCODE -ne 0){throw 'Failed to create the device patch workspace.'}
     & $Adb push "$Work\." /data/local/tmp/kpa-auto-patch/|Out-Null
-    $PatchOutput=& $Adb shell "cd /data/local/tmp/kpa-auto-patch && chmod 755 busybox magisk magiskboot magiskinit boot_patch.sh && BOOTMODE=true KEEPVERITY=true KEEPFORCEENCRYPT=true PATCHVBMETAFLAG=false RECOVERYMODE=false LEGACYSAR=false ASH_STANDALONE=1 ./busybox sh ./boot_patch.sh ./boot.img" 2>&1
+    if($LASTEXITCODE -ne 0){throw 'Failed to transfer the boot patch files.'}
+    $PatchOutput=& $Adb shell sh /data/local/tmp/kpa-auto-patch/patch_boot.sh 2>&1
     $PatchExit=$LASTEXITCODE
     $PatchOutput|ForEach-Object{Write-Host $_}
     if($PatchExit -ne 0){throw 'Magisk boot patch failed.'}
     & $Adb pull /data/local/tmp/kpa-auto-patch/new-boot.img $Output|Out-Null
+    if($LASTEXITCODE -ne 0){throw 'Failed to retrieve the patched boot image.'}
     & $Adb shell rm -rf /data/local/tmp/kpa-auto-patch|Out-Null
     if(-not(Test-Path $Output) -or (Get-Item $Output).Length -ne 33554432){throw 'Patched boot output is invalid.'}
     $PatchedHash=(Get-FileHash $Output -Algorithm SHA256).Hash

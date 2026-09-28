@@ -3,7 +3,7 @@
 [English](README_EN.md) | [简体中文](README_CN.md)
 
 > [!WARNING]
-> Only `BW03_20260828` has been tested on the current device. `BW03_20260730` and `BW03_20260813` have not been tested on hardware. Flashing may cause boot failure, data loss or, in extreme cases, device damage. This toolkit provides no safety guarantee; proceed at your own risk.
+> Direct KPA-Root flashing has been verified on `BW03_20260730` and `BW03_20260828`. The same device also completed two consecutive automatic official OTA patching loops, `0730 → 0813` and `0813 → 0828`. Direct Fastboot flashing of `BW03_20260813` has not been tested separately. Flashing may still cause boot failure, data loss, or device damage. Proceed at your own risk.
 
 ## Supported devices
 
@@ -27,7 +27,7 @@ Scripts display device, firmware, lock state and target partition, select the ac
 
 Run `1_Unlock_EN.cmd`. Unlocking normally erases all user data, so back up first.
 
-Already-unlocked devices exit immediately. Enter `CONTINUE` to enter Bootloader, then `UNLOCK` after preflight. The command may erase data immediately. If an on-device confirmation appears, select Volume Up / YES.
+Enter `YES` to verify the real lock state in Fastboot. An already-unlocked device receives no unlock command and reboots automatically. If Fastboot confirms that it is still locked, enter `YES` again before unlocking. The command may erase data immediately. If an on-device confirmation appears, select Volume Up / YES.
 
 ## 2. Obtain Root
 
@@ -37,9 +37,9 @@ When an image is missing, the script queries the official OTA service, preserves
 
 An automatically generated new version has not been tested on hardware. Successful reconstruction and verification do not eliminate the risk of a boot-chain change or boot failure.
 
-Check the detected firmware again before flashing. Images are provided for 0730 and 0813, but they have not been validated on physical hardware and are not guaranteed to boot or recover correctly.
+Check the detected firmware again before flashing. Direct KPA-Root operation is verified on 0730 and 0828. Direct Fastboot flashing of 0813 remains separately untested.
 
-Enter `ROOT` after preflight. After Android starts, the script installs Magisk and modules, enables Zygisk, and reboots to verify the result.
+After device checks pass, enter `YES` before the script enters Fastboot. After Fastboot verification, enter `YES` again before flashing. Once Android starts, the script installs Magisk and modules, enables Zygisk, and reboots to verify the result. Later prompts that wait for Magisk setup also use `YES` to continue.
 
 Complete Magisk additional setup and any requested restart before continuing on the PC. Tap Allow for Shell superuser requests. If no prompt appears, open Magisk > Superuser and allow Shell.
 
@@ -71,11 +71,17 @@ Play Integrity Fork and Shamiko do not configure hiding lists automatically or g
 
 ## 3. Restore before OTA
 
-Run `3_Restore_EN.cmd` before installing an OTA. The script detects the current firmware and restores the matching stock boot only to the active slot. After preflight, enter `RESTORE`; no slot selection is required.
+Run `3_Restore_EN.cmd` before installing an OTA. The script detects the current firmware and restores the matching stock boot only to the active slot. Enter `YES` at each confirmation; no slot selection is required.
 
-Restore also writes the boot partition. The 0730 and 0813 restore paths have not been tested on hardware; selecting the wrong version or a faulty image may prevent the device from booting.
+Restore also writes the boot partition and uses the same OTA reconstruction feature as the Root script. If the stock boot for the installed firmware is missing, it rebuilds that version step by step from an earlier stock boot and official adjacent incremental OTAs. Restore proceeds only after verification, so later normal OTA releases usually do not require a newly packaged toolkit.
 
-Confirm that Android boots normally before checking for and installing the OTA. After the OTA boots successfully from its new slot, run the Root script again; it can reconstruct and patch a missing image for the new firmware.
+Automatic reconstruction requires Internet access, a continuous official incremental chain and a working ADB connection. If the vendor changes the service or package format, or the chain is incomplete, the script stops without flashing.
+
+Confirm that Android boots normally before checking for and installing the OTA. After the OTA boots successfully from its new slot, run the Root script again; it can reconstruct and patch a missing image for the new firmware. Never flash an older patched boot into a newer firmware build.
+
+The [KPA Tools Root edition](https://github.com/tbc0309/KPA-Tools/releases/latest) is recommended. KPA Root Helper can automate pre-OTA stock restoration, post-update patching and verification of the new slot, while keeping the old slot on its matching stock boot. Restart only after the green **Ready to restart** notice appears in System Update.
+
+Hardware validation completed: KPA-Root on 0730 and 0828; KPA Root Helper official OTA loops from 0730 to 0813 and from 0813 to 0828. A direct KPA-Root Fastboot flash of 0813 has not been tested separately.
 
 Restore menu:
 
@@ -84,7 +90,7 @@ Restore menu:
 
 Already-locked devices exit. Restore is skipped when the current boot SHA256 matches stock. Unreadable partitions are reported as unknown; missing Root does not prove stock boot.
 
-Relock only when all partitions are matching official images. Enter `Y`, then `LOCK-ERASE`. Data may be erased immediately; complete device setup after reboot.
+Relock only when all partitions are matching official images. Enter `YES` twice when prompted. Data may be erased immediately; complete device setup after reboot.
 
 > [!WARNING]
 > Relocking the bootloader is not recommended. Restoring stock boot does not prove that every other partition is official and unmodified. Relocking with a mismatched or modified partition may prevent the device from booting.
@@ -97,22 +103,25 @@ Stock image mapping:
 
 Never mix stock or patched boot images from different firmware versions.
 
-## Official firmware downloads
+## Official Fastboot firmware downloads
 
-- [Official download page](https://www.ayaneo.com/support/download)
+- 中文：[AYANEO 服务支持下载](https://ayaneo.com.cn/support/download)
+- English: [AYANEO Support Download](https://www.ayaneo.com/support/download)
 
-Select “Android Console”, followed by “KONKR Pocket ADVANCE”.
+The pages directly list the KONKR Pocket Advance flashing tool, guide, and Fastboot ROM. The Chinese page includes the flashing-tool guide and 0730 package; the English page lists the 0730 Fastboot ROM.
 
 > [!WARNING]
-> Treat the package currently provided by the official site as a card-update package, not a verified full line-flash recovery package. A card update may not overwrite every low-level partition and is not guaranteed to restore the complete factory state. Do not rely on it as an unbrick package when Android and Recovery are inaccessible.
+> This is an MTK Fastboot flashing package, not an in-system card-update OTA. It writes multiple partitions and may erase data. Follow the matching official tool and guide exactly, and never disconnect USB while flashing.
+
+Select **`Firmware Upgrade`** in SP Flash Tool. Do not use `Download Only` or `Format All + Download`. The official package provides the A-slot boot partitions; `Download Only` may preserve the previously active slot and leave the handheld returning to Fastboot after flashing. If that happens, flash the package again with **`Firmware Upgrade`**. Manually forcing slot A is not part of the normal recovery procedure. The first boot may take 5–10 minutes.
 
 ## Requirements
 
 1. Battery level of at least 50%.
-2. USB debugging enabled and this computer authorized.
+2. Open **Settings → System → Developer options**, enable **OEM unlocking** and **USB debugging**, and authorize this computer.
 3. Use a data-capable USB cable and connect exactly one Android device. Wireless ADB is not used for flashing.
-4. ADB, Fastboot, and a signed Android USB driver are bundled. The launcher checks them automatically and requests Windows administrator approval only when the driver must be installed.
-5. The script reports missing, unauthorized, offline, or multiple devices separately and will not continue to flashing.
+4. ADB, Fastboot, and a signed Android USB driver are included. The script guides the user through tool checks, driver installation, USB debugging authorization, and device preflight; no preinstallation is required.
+5. ADB, Fastboot, Android startup, and Root authorization waits report progress and allow another wait cycle or a safe exit. Unauthorized, offline, or multiple devices never proceed to flashing.
 6. Do not disconnect USB while an image is being flashed.
 
 Each script writes a timestamped log in the current folder.

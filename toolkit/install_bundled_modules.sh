@@ -2,6 +2,12 @@
 
 set -eu
 
+# Preserve binary patch diagnostics without printing them to the console.
+detail_log=/data/local/tmp/kpa_module_install.log
+umask 077
+: > "$detail_log"
+chmod 644 "$detail_log"
+
 install_disabled() {
   module_id="$1"
   archive="$2"
@@ -12,7 +18,13 @@ install_disabled() {
     return
   fi
 
-  magisk --install-module "$archive"
+  echo "=== $module_id ===" >> "$detail_log"
+  if magisk --install-module "$archive" >> "$detail_log" 2>&1; then
+    :
+  else
+    echo "MODULE_FAILED=$module_id"
+    return 1
+  fi
   mkdir -p "/data/adb/modules/$module_id"
   touch "/data/adb/modules/$module_id/disable"
   if [ -d "/data/adb/modules_update/$module_id" ]; then

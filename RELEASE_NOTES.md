@@ -1,15 +1,15 @@
 ## 中文
 
-新增缺失 boot 自动生成：从官方 OTA 相邻增量链合成当前版本原版 boot，并用 Magisk 30.7 自动修补。已有镜像始终优先复用且不会覆盖，下载保留服务器原始文件名。
+同步最新版中文、英文解锁、Root 与恢复脚本，并更新 KPA助手 Root 管理和 OTA 状态实机截图。
 
-提供中文、英文解锁、Root 和恢复脚本。内置 Magisk 及五个默认停用的模块。
+完善 A/B 槽安全检查：线刷后即使 `misc` 中两槽优先级相同，也以 Android 实际运行槽为来源，并在 Fastboot 中再次核对 `current-slot`，不会依据不明确的优先级猜测刷写目标。
 
-**仅 0828 经过 Root 实机测试；0730、0813 及自动生成的后续版本未验证。自动合成成功不代表刷写安全。刷写可能导致数据丢失、无法启动或设备损坏。不建议重新锁定 Bootloader。**
+工具包可在缺少 boot 时，通过官方相邻增量 OTA 合成当前版本原版 boot，再使用 Magisk 30.7 自动修补。已有镜像优先复用且不会覆盖；内置五个默认停用的 Magisk 模块。
 
 ## English
 
-Added automatic generation for a missing boot image. The toolkit reconstructs the current stock boot through official adjacent incremental OTA packages and patches it with Magisk 30.7. Existing images are always reused and never overwritten; downloads retain their server filenames.
+Synchronized the latest Chinese and English unlock, Root, and restore scripts, and refreshed the hardware screenshots for KPA Tools Root Manager and OTA status notices.
 
-Includes Chinese and English unlock, Root and restore scripts, Magisk, and five modules installed disabled by default.
+Hardened A/B slot validation. Even when a line flash leaves equal priorities in `misc`, the toolkit uses the slot currently running Android and verifies Fastboot `current-slot` instead of guessing from ambiguous priority metadata.
 
-**Only 0828 Root has been tested on hardware. 0730, 0813 and automatically generated later builds are unverified. Successful reconstruction does not make flashing safe. Flashing may cause data loss, boot failure or device damage. Bootloader relocking is not recommended.**
+When a boot image is missing, the toolkit can reconstruct its stock boot through official adjacent incremental OTAs and patch it with Magisk 30.7. Existing images are reused without being overwritten. Five Magisk modules are included and disabled by default.

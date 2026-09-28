@@ -48,7 +48,9 @@ function Write-KpaBanner([string]$English, [string]$Chinese) {
 
 function Write-KpaSection([string]$English, [string]$Chinese) {
     Microsoft.PowerShell.Utility\Write-Host ''
-    Microsoft.PowerShell.Utility\Write-Host ('-- ' + (Get-KpaText $English $Chinese) + ' ' + ('-' * 48)) -ForegroundColor Cyan
+    Microsoft.PowerShell.Utility\Write-Host ('-' * 64) -ForegroundColor DarkCyan
+    Microsoft.PowerShell.Utility\Write-Host ('  ' + (Get-KpaText $English $Chinese)) -ForegroundColor Cyan
+    Microsoft.PowerShell.Utility\Write-Host ('-' * 64) -ForegroundColor DarkCyan
     Microsoft.PowerShell.Utility\Write-Host ''
 }
 
@@ -57,6 +59,27 @@ function Write-KpaStatus([string]$English, [string]$Chinese, [string]$Value, [Co
     $Width = 0
     foreach ($Character in $Label.ToCharArray()) { if ([int]$Character -gt 255) { $Width += 2 } else { $Width++ } }
     Microsoft.PowerShell.Utility\Write-Host ('  ' + $Label + ':' + (' ' * [Math]::Max(2, 24 - $Width)) + $Value) -ForegroundColor $Color
+}
+
+function Read-KpaYes([string]$English, [string]$Chinese) {
+    $Prompt = (Get-KpaText $English $Chinese) + (Get-KpaText ' Type YES; anything else cancels.' ' 输入 YES，其他输入取消。')
+    return ((Read-Host $Prompt) -ceq 'YES')
+}
+
+function Write-KpaStep([int]$Current, [int]$Total, [string]$English, [string]$Chinese) {
+    Microsoft.PowerShell.Utility\Write-Host ('  [' + $Current + '/' + $Total + '] ' + (Get-KpaText $English $Chinese)) -ForegroundColor White
+}
+
+function Write-KpaHint([string]$English, [string]$Chinese, [ConsoleColor]$Color = 'Yellow') {
+    Microsoft.PowerShell.Utility\Write-Host ('       ' + (Get-KpaText $English $Chinese)) -ForegroundColor $Color
+}
+
+function Read-KpaRetry([string]$English, [string]$Chinese) {
+    while ($true) {
+        $Choice = Read-Host ((Get-KpaText $English $Chinese) + (Get-KpaText ' [R=retry, Q=stop]' ' [R=继续等待，Q=安全退出]'))
+        if ($Choice -ieq 'R') { return $true }
+        if ($Choice -ieq 'Q') { return $false }
+    }
 }
 
 function Test-KpaAdministrator {
@@ -74,7 +97,7 @@ function Install-KpaUsbDriver {
     if (-not (Test-Path -LiteralPath $script:KpaDriverInf -PathType Leaf)) {
         throw (Get-KpaText 'The bundled Android USB driver is missing.' '缺少内置 Android USB 驱动。')
     }
-    Write-Host 'The Android USB driver is not installed. Windows will request administrator approval. ||| 尚未安装 Android USB 驱动，Windows 即将请求管理员授权。' -ForegroundColor Yellow
+    Write-KpaHint 'The Android USB driver is missing. Accept the Windows administrator prompt.' '缺少 Android USB 驱动。接下来请在 Windows 管理员提示中选择“是”。'
     $Arguments = @('/add-driver', ('"{0}"' -f $script:KpaDriverInf), '/install')
     if (Test-KpaAdministrator) {
         & "$env:SystemRoot\System32\pnputil.exe" @Arguments
@@ -91,59 +114,72 @@ function Install-KpaUsbDriver {
 
 function Initialize-KpaUsbEnvironment([string]$Adb, [string]$Fastboot) {
     Write-KpaSection 'Environment check' '运行环境检查'
+    Write-KpaStep 1 3 'Check ADB and Fastboot tools' '检查 ADB 与 Fastboot 工具'
     foreach ($File in @($Adb, $Fastboot)) {
         if (-not (Test-Path -LiteralPath $File -PathType Leaf)) { throw ((Get-KpaText 'Required tool is missing: ' '缺少必要工具：') + $File) }
     }
     Write-KpaStatus 'Platform tools' 'ADB / Fastboot 工具' 'OK' Green
+    Write-KpaStep 2 3 'Check the Windows USB driver' '检查 Windows USB 驱动'
     if (-not (Test-KpaUsbDriver)) { Install-KpaUsbDriver }
     Write-KpaStatus 'Android USB driver' 'Android USB 驱动' 'OK' Green
 
     # Root operations require one stable USB transport, not a duplicate wireless ADB endpoint.
+    Write-KpaStep 3 3 'Connect and authorize the handheld' '连接并授权掌机'
+    Write-KpaHint 'On the handheld: Settings > System > Developer options > enable OEM unlocking and USB debugging.' '掌机操作：设置 → 系统 → 开发者选项 → 开启 OEM 解锁和 USB 调试。'
+    Write-KpaHint 'Use a data-capable USB cable, unlock the screen, then tap Allow when prompted.' '使用支持数据传输的 USB 线，解锁屏幕；弹出授权时点击“允许”。'
+    Write-KpaHint 'Wireless ADB is disconnected automatically to prevent selecting the wrong device.' '脚本会自动断开无线 ADB，避免选错设备。' DarkGray
     & $Adb disconnect 2>&1 | Out-Null
     & $Adb start-server 2>&1 | Out-Null
-    Write-Host 'Waiting for one USB device. Unlock the screen and approve this computer if prompted. ||| 正在等待一台 USB 设备。如掌机弹出提示，请解锁屏幕并允许此电脑调试。' -ForegroundColor Yellow
-    $LastState = ''
-    for ($Attempt = 0; $Attempt -lt 60; $Attempt++) {
-        $Rows = @(& $Adb devices 2>$null | Select-Object -Skip 1 | Where-Object { $_ -match '\S' })
-        $Authorized = @($Rows | Where-Object { $_ -match '\sdevice$' })
-        $Unauthorized = @($Rows | Where-Object { $_ -match '\sunauthorized$' })
-        $Offline = @($Rows | Where-Object { $_ -match '\soffline$' })
-        if ($Authorized.Count -eq 1 -and $Rows.Count -eq 1) {
-            $Serial = (($Authorized[0] -split '\s+')[0]).Trim()
-            $script:KpaSerial = $Serial
-            $env:ANDROID_SERIAL = $Serial
-            Write-KpaStatus 'ADB connection' 'ADB 连接' ('OK  [' + $Serial + ']') Green
-            return $Serial
+    while ($true) {
+        Write-KpaHint 'Waiting for one authorized USB device. You have three minutes.' '正在等待一台已授权的 USB 设备，本轮等待三分钟。'
+        $LastState = ''
+        for ($Attempt = 0; $Attempt -lt 90; $Attempt++) {
+            $Rows = @(& $Adb devices 2>$null | Select-Object -Skip 1 | Where-Object { $_ -match '\S' })
+            $Authorized = @($Rows | Where-Object { $_ -match '\sdevice$' })
+            $Unauthorized = @($Rows | Where-Object { $_ -match '\sunauthorized$' })
+            $Offline = @($Rows | Where-Object { $_ -match '\soffline$' })
+            if ($Authorized.Count -eq 1 -and $Rows.Count -eq 1) {
+                $Serial = (($Authorized[0] -split '\s+')[0]).Trim()
+                $script:KpaSerial = $Serial
+                $env:ANDROID_SERIAL = $Serial
+                Write-KpaStatus 'ADB connection' 'ADB 连接' ('OK  [' + $Serial + ']') Green
+                return $Serial
+            }
+            if ($Authorized.Count -gt 1 -or ($Authorized.Count -eq 1 -and $Rows.Count -gt 1)) {
+                throw (Get-KpaText 'Multiple ADB devices were detected. Disconnect all other Android devices.' '检测到多台 ADB 设备，请断开其他 Android 设备。')
+            }
+            $State = if ($Unauthorized.Count) { 'unauthorized' } elseif ($Offline.Count) { 'offline' } else { 'missing' }
+            if ($State -ne $LastState) {
+                if ($State -eq 'unauthorized') { Write-KpaHint 'Authorization is waiting on the handheld. Tap Allow.' '掌机正在等待授权，请点击“允许”。' }
+                elseif ($State -eq 'offline') { Write-KpaHint 'ADB is offline. Restarting the ADB service.' 'ADB 设备离线，正在重启 ADB 服务。'; & $Adb kill-server 2>&1 | Out-Null; & $Adb start-server 2>&1 | Out-Null }
+                else { Write-KpaHint 'No USB device yet. Check the cable and USB debugging.' '尚未检测到 USB 设备，请检查数据线和 USB 调试。' }
+                $LastState = $State
+            }
+            if ($Attempt -gt 0 -and ($Attempt % 15) -eq 0) { Write-KpaHint ("Still waiting: $($Attempt * 2) s") ("仍在等待：$($Attempt * 2) 秒") DarkGray }
+            Start-Sleep -Seconds 2
         }
-        if ($Authorized.Count -gt 1 -or ($Authorized.Count -eq 1 -and $Rows.Count -gt 1)) {
-            throw (Get-KpaText 'Multiple ADB devices were detected. Disconnect all other Android devices.' '检测到多台 ADB 设备，请断开其他 Android 设备。')
-        }
-        $State = if ($Unauthorized.Count) { 'unauthorized' } elseif ($Offline.Count) { 'offline' } else { 'missing' }
-        if ($State -ne $LastState) {
-            if ($State -eq 'unauthorized') { Write-Host 'Authorization required on the handheld. ||| 请在掌机上允许 USB 调试授权。' -ForegroundColor Yellow }
-            elseif ($State -eq 'offline') { Write-Host 'ADB is offline; restarting the ADB service. ||| ADB 设备离线，正在重启 ADB 服务。' -ForegroundColor Yellow; & $Adb kill-server 2>&1 | Out-Null; & $Adb start-server 2>&1 | Out-Null }
-            else { Write-Host 'No USB device detected. Check the data cable and enable USB debugging. ||| 未检测到 USB 设备，请检查数据线并开启 USB 调试。' -ForegroundColor Yellow }
-            $LastState = $State
-        }
-        Start-Sleep -Seconds 2
+        if (-not (Read-KpaRetry 'The device is not ready.' '设备尚未连接成功。')) { throw (Get-KpaText 'Stopped safely before any device change.' '已在修改设备前安全退出。') }
     }
-    throw (Get-KpaText 'Timed out while waiting for an authorized USB ADB device.' '等待已授权的 USB ADB 设备超时。')
 }
 
 function Wait-KpaFastbootDevice([string]$Fastboot) {
-    Write-Host 'Waiting for Fastboot USB connection... ||| 正在等待 Fastboot USB 连接……' -ForegroundColor Yellow
-    for ($Attempt = 0; $Attempt -lt 60; $Attempt++) {
-        $Devices = @(& $Fastboot devices 2>$null | Where-Object { $_ -match '\S' })
-        if ($Devices.Count -eq 1) {
-            if (($Devices[0] -split '\s+')[0] -ne $script:KpaSerial) { throw (Get-KpaText 'A different Fastboot device was connected.' 'Fastboot 设备与原掌机不一致，已停止。') }
-            Write-KpaStatus 'Fastboot connection' 'Fastboot 连接' 'OK' Green
-            return
+    Write-KpaSection 'Fastboot connection' '连接 Fastboot'
+    Write-KpaHint 'The handheld should show FASTBOOT MODE. Keep USB connected; no button is needed yet.' '掌机应显示 FASTBOOT MODE。保持 USB 连接，此时无需按键。'
+    while ($true) {
+        for ($Attempt = 0; $Attempt -lt 90; $Attempt++) {
+            $Devices = @(& $Fastboot devices 2>$null | Where-Object { $_ -match '\S' })
+            if ($Devices.Count -eq 1) {
+                if (($Devices[0] -split '\s+')[0] -ne $script:KpaSerial) { throw (Get-KpaText 'A different Fastboot device was connected.' 'Fastboot 设备与原掌机不一致，已停止。') }
+                Write-KpaStatus 'Fastboot connection' 'Fastboot 连接' 'OK' Green
+                return
+            }
+            if ($Devices.Count -gt 1) { throw (Get-KpaText 'Multiple Fastboot devices were detected.' '检测到多台 Fastboot 设备。') }
+            if ($Attempt -eq 5 -or ($Attempt -gt 5 -and ($Attempt % 30) -eq 0)) { & "$env:SystemRoot\System32\pnputil.exe" /scan-devices | Out-Null }
+            if ($Attempt -gt 0 -and ($Attempt % 15) -eq 0) { Write-KpaHint ("Still waiting: $($Attempt * 2) s") ("仍在等待：$($Attempt * 2) 秒") DarkGray }
+            Start-Sleep -Seconds 2
         }
-        if ($Devices.Count -gt 1) { throw (Get-KpaText 'Multiple Fastboot devices were detected.' '检测到多台 Fastboot 设备。') }
-        if ($Attempt -eq 5) { & "$env:SystemRoot\System32\pnputil.exe" /scan-devices | Out-Null }
-        Start-Sleep -Seconds 2
+        if (-not (Read-KpaRetry 'Fastboot is not connected. Reconnect USB or check Device Manager.' '尚未连接 Fastboot。请重新插拔 USB 或检查设备管理器。')) { throw (Get-KpaText 'Stopped safely before flashing.' '已在刷写前安全退出。') }
     }
-    throw (Get-KpaText 'Fastboot was not detected. Reconnect USB and check Device Manager.' '未检测到 Fastboot，请重新连接 USB 并检查设备管理器。')
 }
 
 # Bound each status probe so a disconnected USB device cannot hang the monitor.
@@ -167,23 +203,48 @@ function Get-KpaProbe([string]$File, [string]$Arguments) {
 
 function Wait-KpaAndroid([int]$TimeoutSeconds = 300) {
     Write-KpaSection 'Waiting for Android' '等待 Android 启动'
-    $Timer = [Diagnostics.Stopwatch]::StartNew()
-    $NextReport = 0
-    while ($Timer.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
-        if ((Get-KpaProbe $Adb "-s $script:KpaSerial shell getprop sys.boot_completed") -eq '1') {
-            Write-Host 'Android startup verified. ||| 已确认 Android 启动完成。' -ForegroundColor Green
-            return
+    Write-Host (Get-KpaText 'Keep USB connected. Unlock the screen and allow USB debugging if prompted.' '保持 USB 连接；启动后解锁屏幕，如有提示请允许 USB 调试。') -ForegroundColor Yellow
+    Write-Host ''
+    while ($true) {
+        $Timer = [Diagnostics.Stopwatch]::StartNew()
+        $NextReport = 0
+        while ($Timer.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+            if ((Get-KpaProbe $Adb "-s $script:KpaSerial shell getprop sys.boot_completed") -eq '1') {
+                Write-Host 'Android startup verified. ||| 已确认 Android 启动完成。' -ForegroundColor Green
+                return
+            }
+            if ($Timer.Elapsed.TotalSeconds -ge $NextReport) {
+                Write-Host ('  ' + (Get-KpaText 'Waiting: ' '已等待：') + [int]$Timer.Elapsed.TotalSeconds + ' s') -ForegroundColor DarkGray
+                $NextReport += 30
+            }
+            Start-Sleep -Seconds 2
         }
-        if ($Timer.Elapsed.TotalSeconds -ge $NextReport) {
-            Write-Host ((Get-KpaText 'Waiting; unlock the screen and approve USB debugging if prompted. Elapsed: ' '等待中；如有提示请解锁屏幕并允许 USB 调试。已等待：') + [int]$Timer.Elapsed.TotalSeconds + ' s')
-            $NextReport += 15
-        }
-        Start-Sleep -Seconds 2
+        if (-not (Read-KpaRetry 'Android has not finished starting. Check the handheld.' 'Android 尚未完成启动，请检查掌机。')) { throw (Get-KpaText 'Stopped while waiting for Android.' '已停止等待 Android。') }
     }
-    throw (Get-KpaText 'Android startup could not be verified before timeout. Check the handheld.' '等待超时，尚未确认 Android 启动完成，请检查掌机。')
 }
 
-function Complete-KpaUnlock {
+function ConvertFrom-KpaBootLock([string]$BootArguments) {
+    # Do not infer the lock state from AVB color or resetprop-modifiable properties.
+    $States = @([regex]::Matches($BootArguments, '(?:^|\s)androidboot\.vbmeta\.device_state\s*=\s*"?(locked|unlocked)"?(?=\s|$)') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
+    if ($States.Count -ne 1) { return 'unknown' }
+    if ($States[0] -eq 'unlocked') { return '0' }
+    return '1'
+}
+
+function Get-KpaBootLock {
+    $Parts = @()
+    foreach ($Path in @('/proc/cmdline', '/proc/bootconfig')) {
+        $Text = Get-KpaProbe $Adb "-s $script:KpaSerial shell cat $Path"
+        if (-not $Text) { $Text = Get-KpaProbe $Adb "-s $script:KpaSerial shell su -c 'cat $Path'" }
+        $Parts += $Text
+    }
+    return ConvertFrom-KpaBootLock ($Parts -join "`n")
+}
+
+function Complete-KpaUnlock(
+    [scriptblock]$WaitForAndroid = { Wait-KpaAndroid },
+    [scriptblock]$GetAndroidLock = { Get-KpaBootLock }
+) {
     Write-KpaSection 'Verifying unlock and restarting' '验证解锁并重启'
     $Timer = [Diagnostics.Stopwatch]::StartNew()
     while ($Timer.Elapsed.TotalSeconds -lt 120) {
@@ -191,12 +252,12 @@ function Complete-KpaUnlock {
         if ($State -match 'unlocked:\s*yes') {
             & $Fastboot -s $script:KpaSerial reboot
             if ($LASTEXITCODE -ne 0) { throw (Get-KpaText 'Unlock verified, but reboot failed.' '解锁已确认，但重启失败。') }
-            Wait-KpaAndroid
+            & $WaitForAndroid
             return
         }
         if ($State -match 'unlocked:\s*no') { throw (Get-KpaText 'The device is still locked.' '设备仍处于锁定状态。') }
-        if ((Get-KpaProbe $Adb "-s $script:KpaSerial shell getprop ro.boot.flash.locked") -eq '0') {
-            Wait-KpaAndroid
+        if ((& $GetAndroidLock) -eq '0') {
+            & $WaitForAndroid
             return
         }
         Start-Sleep -Seconds 2

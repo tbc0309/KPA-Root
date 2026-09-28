@@ -10,7 +10,6 @@ function mock-fastboot {
     $script:Reboots++
     $global:LASTEXITCODE = 0
 }
-function Wait-KpaAndroid { $script:BootChecks++ }
 function Get-KpaProbe {
     param($File, $Arguments)
     if ($File -eq $Fastboot) {
@@ -19,6 +18,7 @@ function Get-KpaProbe {
         if ($script:Scenario -eq 'reconnect' -and $script:Probes -gt 1) { return 'unlocked: yes' }
         return ''
     }
+    if ($Arguments -match 'sys\.boot_completed') { $script:BootChecks++; return '1' }
     if ($script:Scenario -eq 'already-booted') { return '0' }
     return ''
 }
@@ -28,7 +28,11 @@ foreach ($Scenario in @('reconnect', 'already-booted', 'locked')) {
     $script:BootChecks = 0
     $script:Probes = 0
     $Failed = $false
-    try { Complete-KpaUnlock } catch { $Failed = $true }
+    try {
+        Complete-KpaUnlock `
+            -WaitForAndroid { $script:BootChecks++ } `
+            -GetAndroidLock { if ($script:Scenario -eq 'already-booted') { '0' } else { 'unknown' } }
+    } catch { $Failed = $true }
     if ($Scenario -eq 'reconnect' -and ($Failed -or $Reboots -ne 1 -or $BootChecks -ne 1)) { throw 'Reconnect test failed' }
     if ($Scenario -eq 'already-booted' -and ($Failed -or $Reboots -ne 0 -or $BootChecks -ne 1)) { throw 'Already booted test failed' }
     if ($Scenario -eq 'locked' -and (-not $Failed -or $Reboots -ne 0 -or $BootChecks -ne 0)) { throw 'Locked device test failed' }

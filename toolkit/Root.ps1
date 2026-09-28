@@ -4,6 +4,7 @@ param([ValidateSet('CN','EN')][string]$Language = 'CN', [switch]$PreflightOnly)
 . (Join-Path $PSScriptRoot 'KPA.Common.ps1')
 . (Join-Path $PSScriptRoot 'KPA.Magisk.ps1')
 . (Join-Path $PSScriptRoot 'KPA.OtaBoot.ps1')
+. (Join-Path $PSScriptRoot 'KPA.PostRoot.ps1')
 $script:KpaManagerRepairUsed = $false
 
 $ErrorActionPreference = 'Stop'
@@ -32,25 +33,51 @@ function Get-FastbootVar([string]$Name) {
 }
 
 function Install-BundledModulesDisabled {
-    Write-Host 'Installing bundled modules in disabled state / 正在安装内置模块（默认停用）...' -ForegroundColor Cyan
+    Wait-KpaShellRoot
+    Write-KpaSection 'Bundled modules' '安装内置模块'
+    Write-Host (Get-KpaText 'Installing 5 modules. Please wait; keep USB connected.' '正在处理 5 个模块，请稍候并保持 USB 连接。')
+    Write-Host (Get-KpaText 'New modules remain disabled. Existing modules are preserved.' '新模块默认停用；已有模块及其开关状态保持不变。')
+    Write-Host ''
     foreach ($Module in @($FontModule, $RgbModule, $PifModule, $ShamikoModule, $DolbyModule)) {
-        & $Adb push $Module ('/data/local/tmp/' + (Split-Path $Module -Leaf)) | Out-Null
+        Invoke-KpaAdbTransfer -TransferArguments @('push', $Module, ('/data/local/tmp/' + (Split-Path $Module -Leaf)))
         if ($LASTEXITCODE -ne 0) { throw (Get-KpaText 'Module transfer failed.' '模块传输失败。') }
     }
-    & $Adb push $ModuleInstaller /data/local/tmp/install_bundled_modules.sh | Out-Null
+    Invoke-KpaAdbTransfer -TransferArguments @('push', $ModuleInstaller, '/data/local/tmp/install_bundled_modules.sh')
     if ($LASTEXITCODE -ne 0) { throw (Get-KpaText 'Installer transfer failed.' '安装脚本传输失败。') }
-    $Output = (& $Adb shell su -c 'sh /data/local/tmp/install_bundled_modules.sh' 2>&1 | Out-String)
-    if ($LASTEXITCODE -ne 0) { throw "Bundled module installation failed / 内置模块安装失败：$Output" }
-    Write-Host $Output.Trim()
+    $Result = Invoke-KpaRootScript '/data/local/tmp/install_bundled_modules.sh'
+    $Output = $Result.Output
+    $DetailLog = [IO.Path]::ChangeExtension($Log, 'modules.log')
+    Invoke-KpaAdbTransfer -TransferArguments @('pull', '/data/local/tmp/kpa_module_install.log', $DetailLog)
+    if ($LASTEXITCODE -ne 0) { Write-Host (Get-KpaText 'Could not retrieve module diagnostics.' '未能取回模块详细日志。') -ForegroundColor Yellow }
+    $Names = @{ kpa_myuppy_font='KPA MYuppy Font'; kpa_rgb_control='KPA RGB Control'; playintegrityfix='Play Integrity Fork'; zygisk_shamiko='Shamiko'; DolbyAtmos='Dolby Atmos' }
+    foreach ($Line in ($Output -split '\r?\n')) {
+        if ($Line -match '^MODULE_(INSTALLED_DISABLED|SKIPPED|FAILED)=(\w+)$') {
+            $State = $Matches[1]; $Id = $Matches[2]
+            $Label = if ($Names.ContainsKey($Id)) { $Names[$Id] } else { $Id }
+            $Text = switch ($State) {
+                'INSTALLED_DISABLED' { Get-KpaText 'Installed / disabled' '已安装，未启用' }
+                'SKIPPED' { Get-KpaText 'Existing / unchanged' '已存在，保持不变' }
+                'FAILED' { Get-KpaText 'Failed' '安装失败' }
+            }
+            $Color = if ($State -eq 'FAILED') { 'Red' } else { 'Green' }
+            Write-KpaStatus $Label $Label $Text $Color
+            Write-Host ''
+        }
+    }
+    Write-Host ((Get-KpaText 'Module log: ' '模块详细日志：') + (Split-Path $DetailLog -Leaf)) -ForegroundColor DarkGray
+    if ($Result.ExitCode -ne 0) { throw (Get-KpaText 'Module installation failed. See the module log.' '模块安装失败，请查看模块详细日志。') }
     & $Adb shell rm -f /data/local/tmp/KPA_MYuppy_Font.zip /data/local/tmp/KPA_RGB_Control.zip /data/local/tmp/PlayIntegrityFork.zip /data/local/tmp/Shamiko.zip /data/local/tmp/DolbyAtmos_RazerPhone2_v1.0.6_fix.zip /data/local/tmp/install_bundled_modules.sh | Out-Null
 }
 
 Start-Transcript -LiteralPath $Log | Out-Null
 try {
     Write-KpaBanner 'KONKR Pocket Advance - Root' 'KONKR Pocket Advance - 获取 Root'
-    Write-Host 'Bootloader must already be unlocked / Bootloader 必须已经解锁。'
-    Write-Host 'Only the active boot slot is flashed / 只刷当前活动槽，不改另一槽。' -ForegroundColor Yellow
-    Write-Host 'Before every OTA, restore the matching stock boot / 每次 OTA 前必须恢复匹配的原版 boot。' -ForegroundColor Red
+    Write-KpaSection 'Before you start' '开始前须知'
+    Write-KpaStatus 'Bootloader' 'Bootloader' (Get-KpaText 'Must be unlocked' '必须已解锁') Yellow
+    Write-KpaStatus 'Flash target' '刷写范围' (Get-KpaText 'Active boot slot only' '仅当前活动 boot 槽') Yellow
+    Write-KpaStatus 'Before OTA' 'OTA 前' (Get-KpaText 'Restore stock boot first' '必须先恢复原版 boot') Red
+    Write-KpaHint 'After an OTA and the first successful boot, run this Root script again. A missing boot is reconstructed from official incremental OTAs.' 'OTA 完成并成功进入新系统后，再次运行本 Root 脚本；缺少 boot 时会从官方增量 OTA 自动合成。'
+    Write-KpaHint 'For automatic OTA preparation and post-update patching, use the Root edition of KPA Tools with KPA Root Helper.' '如需自动完成 OTA 前准备和更新后修补，建议配合 KPA助手 Root 版的 KPA Root Helper。' DarkGray
 
     foreach ($File in @($Adb, $Fastboot, $MagiskApk, $ZygiskScript, $StatusScript, $ModuleInstaller, $FontModule, $RgbModule, $PifModule, $ShamikoModule, $DolbyModule)) {
         if (-not (Test-Path -LiteralPath $File -PathType Leaf)) { throw "Required file missing / 缺少文件：$File" }
@@ -71,7 +98,7 @@ try {
     $Slot = (& $Adb shell getprop ro.boot.slot_suffix).Trim().TrimStart('_')
     $Serial = (& $Adb get-serialno).Trim()
     $BootState = (& $Adb shell getprop ro.boot.verifiedbootstate).Trim()
-    $FlashLocked = (& $Adb shell getprop ro.boot.flash.locked).Trim()
+    $FlashLocked = Get-KpaBootLock
 
     $IsRooted = $false
     $MagiskVersion = Get-KpaText 'not available' '不可用'
@@ -86,7 +113,8 @@ try {
     $RootProbe = Get-KpaProbe $Adb "-s $script:KpaSerial shell su -c id"
     if ($RootProbe -match 'uid=0') {
         $IsRooted = $true
-        & $Adb push $StatusScript /data/local/tmp/check_root_status.sh | Out-Null
+        Invoke-KpaAdbTransfer -TransferArguments @('push', $StatusScript, '/data/local/tmp/check_root_status.sh')
+        if ($LASTEXITCODE -ne 0) { throw (Get-KpaText 'Status script transfer failed.' '状态检查脚本传输失败。') }
         $StatusText = (& $Adb shell su -c 'sh /data/local/tmp/check_root_status.sh' 2>&1 | Out-String)
         & $Adb shell rm -f /data/local/tmp/check_root_status.sh | Out-Null
         if ($StatusText -match '(?m)^MAGISK_VERSION=(.+)$') { $MagiskVersion = $Matches[1].Trim() }
@@ -132,19 +160,17 @@ try {
     }
     if ($Slot -notin @('a','b')) { throw "Unable to determine active slot / 无法识别活动槽：$Slot" }
 
-    Write-KpaSection 'Android preflight' 'Android 预检'
+    Write-KpaSection 'Device information' '设备信息'
     Write-KpaStatus 'ADB serial' '设备序列号' ("$Serial") Gray
-    Write-KpaStatus 'Model' '型号' ("$Model") Green
-    Write-KpaStatus 'Device' '设备代号' ("$Device") Gray
-    Write-KpaStatus 'Board' '主板' ("$Board") Green
-    Write-KpaStatus 'Build' '系统版本' ("$Build") Green
-    Write-KpaStatus 'Incremental' '构建号' ("$Incremental") Gray
+    Write-KpaStatus 'Model / board' '型号 / 主板' ("$Model / $Board") Gray
+    Write-KpaStatus 'Build' '系统版本' ("$Build") White
     Write-KpaStatus 'Android / SDK' 'Android / SDK' ("$Android / $Sdk") Gray
     Write-KpaStatus 'Active slot' '活动槽' ("$Slot") Yellow
     Write-KpaStatus 'Boot state' 'AVB 状态' ("$BootState") Gray
     Write-KpaStatus 'Flash locked' '锁状态' ("$FlashLocked") Gray
+    Write-KpaSection 'Root and Magisk' 'Root 与 Magisk'
     if ($IsRooted) {
-        Write-Host 'Root status: ROOTED ||| Root 状态：已获取 Root' -ForegroundColor Green
+        Write-KpaStatus 'Root' 'Root 状态' (Get-KpaText 'Granted' '已获取 Root') Green
         if (-not $CoreUpToDate) {
             Write-Host "Magisk Core: $MagiskVersion ($MagiskCode) - UPDATE AVAILABLE ||| Magisk 核心版本：$MagiskVersion ($MagiskCode) - 可更新到 $BundledMagiskVersion" -ForegroundColor Red
         } else {
@@ -157,20 +183,24 @@ try {
         }
         Write-KpaStatus 'Bundled' '工具包版本' ("Magisk $BundledMagiskVersion ($BundledMagiskCode)") Gray
         if ($ZygiskEnabled -and $ZygiskProcess -eq 'running') {
-            Write-Host 'Zygisk: active ||| Zygisk：已生效' -ForegroundColor Green
+            Write-KpaStatus 'Zygisk' 'Zygisk' (Get-KpaText 'Active' '已生效') Green
         } elseif ($ZygiskEnabled) {
-            Write-Host 'Zygisk: enabled; activation not verified ||| Zygisk：已开启，尚未确认生效' -ForegroundColor Yellow
+            Write-KpaStatus 'Zygisk' 'Zygisk' (Get-KpaText 'Enabled; not verified' '已开启，尚未确认生效') Yellow
         } else {
-            Write-Host "Zygisk: DISABLED; setting=$ZygiskSetting ||| Zygisk：未开启；设置值=$ZygiskSetting" -ForegroundColor Red
+            Write-KpaStatus 'Zygisk' 'Zygisk' (Get-KpaText 'Disabled' '未开启') Yellow
         }
     } else {
-        Write-Host 'Root status: NOT DETECTED ||| Root 状态：未检测到 Root' -ForegroundColor Red
-        Write-Host 'If Shell authorization appears, approve it and run again / 若弹出 Shell 授权，请批准后重新运行。' -ForegroundColor Yellow
+        Write-KpaStatus 'Root' 'Root 状态' (Get-KpaText 'Not detected' '未检测到') Yellow
+        Write-KpaHint 'This is expected before the first Root flash. Continue after checking the device and image summary.' '首次获取 Root 前属于正常状态，请核对设备与镜像摘要后继续。' DarkGray
     }
-    Write-KpaStatus 'Firmware' '固件匹配' ("$FirmwareVersion") Green
+    Write-KpaSection 'Matched boot image' '已匹配的刷写镜像'
+    Write-KpaStatus 'Firmware' '固件匹配' ("$FirmwareVersion") White
     Write-KpaStatus 'Image' '目标镜像' ("$(Split-Path -Leaf $PatchedBoot)") Yellow
     Write-KpaStatus 'Image size' '镜像大小' ("$((Get-Item -LiteralPath $PatchedBoot).Length) bytes") Gray
-    Write-Host "SHA256                 : $ExpectedBootHash" -ForegroundColor Green
+    Write-KpaStatus 'SHA256' 'SHA256 校验' (Get-KpaText 'Passed' '通过') Green
+    Write-Host ('  ' + $ExpectedBootHash.Substring(0, 32)) -ForegroundColor DarkGray
+    Write-Host ('  ' + $ExpectedBootHash.Substring(32)) -ForegroundColor DarkGray
+    Write-Host ''
     Write-KpaStatus 'Target' '目标分区' ("boot_$Slot") Yellow
 
     if ($PreflightOnly) {
@@ -181,9 +211,14 @@ try {
 
     if ($IsRooted) {
         Write-KpaSection 'Existing Root actions' '已有 Root 操作'
-        Write-Host '[1] Update/repair Magisk app and enable Zygisk; do not flash boot / [1] 更新/修复 Magisk 管理器并开启 Zygisk；不刷 boot' -ForegroundColor Green
-        Write-Host '[2] Force reflash the matched Root boot / [2] 强制重新刷写已匹配的 Root boot' -ForegroundColor Yellow
-        Write-Host '[0] Exit without changes / [0] 不做修改并退出'
+        Write-Host (Get-KpaText '  [1] Configure Magisk and modules' '  [1] 配置 Magisk 和模块') -ForegroundColor White
+        Write-Host (Get-KpaText '      Repair manager, enable Zygisk, install modules. No boot write.' '      修复管理器、开启 Zygisk、安装模块；不刷写 boot。') -ForegroundColor Gray
+        Write-Host ''
+        Write-Host (Get-KpaText '  [2] Reflash Root boot' '  [2] 重新刷写 Root boot') -ForegroundColor Yellow
+        Write-Host (Get-KpaText '      Write the matched image. Confirmation is required.' '      写入匹配的镜像，执行前需要再次确认。') -ForegroundColor Gray
+        Write-Host ''
+        Write-Host (Get-KpaText '  [0] Exit without changes' '  [0] 退出，不做修改') -ForegroundColor White
+        Write-Host ''
         if (-not $CoreUpToDate) {
             Write-Host 'NOTICE: Updating the APK alone does not update Magisk Core. Choose [2] to update Core via the bundled Root boot. ||| 注意：仅更新 APK 不会升级 Magisk Core；要升级核心，请选择 [2] 刷写工具包中的 Root boot。' -ForegroundColor Red
         }
@@ -193,18 +228,21 @@ try {
             exit 0
         }
         elseif ($Action -eq '1') {
+            if (-not (Read-KpaYes 'Configure Magisk, Zygisk and bundled modules, then reboot?' '配置 Magisk、Zygisk 和随包模块，然后重启？')) {
+                Write-Host 'Cancelled safely; no changes were made. ||| 已安全取消，未执行修改。' -ForegroundColor Green
+                exit 0
+            }
             Write-Host 'Installing/updating Magisk manager / 正在安装或更新 Magisk 管理器...'
             if ((Get-KpaManagerCode) -le $BundledMagiskCode) {
                 & $Adb install -r $MagiskApk
                 if ($LASTEXITCODE -ne 0) { throw 'Magisk APK installation failed / Magisk APK 安装失败。' }
             }
             Ensure-KpaManager
-            & $Adb push $ZygiskScript /data/local/tmp/enable_zygisk.sh | Out-Null
-            & $Adb shell su -c 'chmod 755 /data/local/tmp/enable_zygisk.sh && /data/local/tmp/enable_zygisk.sh'
-            if ($LASTEXITCODE -ne 0) { throw 'Failed to enable Zygisk / 无法开启 Zygisk。' }
+            Wait-KpaShellRoot
+            $ZygiskConfigured = Enable-KpaZygiskOptional
             & $Adb shell rm -f /data/local/tmp/enable_zygisk.sh | Out-Null
             Install-BundledModulesDisabled
-            Write-Host 'Magisk manager updated and Zygisk enabled. Rebooting / Magisk 管理器已更新，Zygisk 已开启，正在重启...' -ForegroundColor Green
+            Write-Host (Get-KpaText 'Magisk and module setup completed. Rebooting...' 'Magisk 与模块配置完成，正在重启……') -ForegroundColor Green
             & $Adb reboot
             if ($LASTEXITCODE -ne 0) { throw (Get-KpaText 'Android reboot failed.' 'Android 重启失败。') }
             Wait-KpaAndroid
@@ -217,6 +255,12 @@ try {
         Write-Host 'Force reflash selected / 已选择强制重新刷写。' -ForegroundColor Yellow
     }
 
+    Write-KpaSection 'Enter Fastboot' '进入 Fastboot'
+    Write-KpaHint 'The handheld will restart and display FASTBOOT MODE. Keep USB connected.' '掌机将重启并显示 FASTBOOT MODE，请保持 USB 连接。'
+    if (-not (Read-KpaYes 'Device checks passed. Enter Fastboot and continue Root?' '设备检查通过。进入 Fastboot 并继续 Root？')) {
+        Write-Host 'Cancelled safely; no partition was written. ||| 已安全取消，未写入任何分区。' -ForegroundColor Green
+        exit 0
+    }
     Write-Host 'Rebooting to bootloader / 正在重启到 Bootloader...'
     & $Adb reboot bootloader
     if ($LASTEXITCODE -ne 0) { throw (Get-KpaText 'Failed to enter Bootloader.' '无法进入 Bootloader，已停止。') }
@@ -236,8 +280,7 @@ try {
     Write-KpaStatus 'Final target' '最终目标' ("boot_$Slot") Yellow
     Write-Host 'WARNING: Flashing boot begins after confirmation / 警告：确认后将开始刷写 boot。' -ForegroundColor Red
     Write-Host 'Restore matching stock boot before OTA / OTA 前必须恢复匹配的原版 boot。' -ForegroundColor Red
-    $Confirm = Read-Host 'Type ROOT to continue / 输入 ROOT 继续'
-    if ($Confirm -cne 'ROOT') {
+    if (-not (Read-KpaYes 'Flash the verified Root boot?' '刷写已验证的 Root boot？')) {
         & $Fastboot -s $script:KpaSerial reboot | Out-Null
         throw 'Cancelled safely; rebooting Android / 已安全取消，正在重启 Android。'
     }
@@ -258,57 +301,61 @@ try {
     Ensure-KpaManager
     & $Adb shell monkey -p com.topjohnwu.magisk -c android.intent.category.LAUNCHER 1 | Out-Null
     Write-KpaSection 'Magisk first-time setup' 'Magisk 首次初始化'
-    Write-Host 'Complete Magisk additional setup and restart if requested. ||| 在掌机完成 Magisk 额外设置，并按提示重启。' -ForegroundColor Yellow
+    Write-KpaStep 1 3 'Look at the handheld and complete Magisk additional setup' '查看掌机并完成 Magisk 额外设置'
+    Write-KpaStep 2 3 'Allow Magisk to restart the device when requested' 'Magisk 要求重启时允许重启'
+    Write-KpaStep 3 3 'Unlock the screen and allow USB debugging again, then return here' '重启后解锁屏幕，再次允许 USB 调试，然后回到电脑'
     Write-Host 'Keep USB connected. After restart, unlock the screen and approve USB debugging if prompted. ||| 保持 USB 连接；重启后解锁屏幕，按提示允许 USB 调试。'
-    [void](Read-Host 'Press Enter after setup and restart ||| 完成设置及重启后按回车')
+    if (-not (Read-KpaYes 'Has Magisk setup and the requested restart completed?' 'Magisk 设置及所需重启是否已经完成？')) {
+        throw (Get-KpaText 'Stopped before post-Root verification.' '已停止，尚未执行 Root 后校验。')
+    }
     Wait-KpaAndroid
 
     $RepairBefore = $script:KpaManagerRepairUsed
     Ensure-KpaManager
     if (-not $RepairBefore -and $script:KpaManagerRepairUsed) {
         & $Adb shell monkey -p com.topjohnwu.magisk -c android.intent.category.LAUNCHER 1 | Out-Null
-        [void](Read-Host 'Check Magisk and finish any requested setup/restart, then press Enter ||| 请检查 Magisk，完成可能出现的额外设置及重启，再按回车')
+        if (-not (Read-KpaYes 'Has the additional Magisk setup and restart completed?' 'Magisk 额外设置及重启是否已经完成？')) {
+            throw (Get-KpaText 'Stopped before the final Magisk verification.' '已停止，尚未执行最终 Magisk 校验。')
+        }
         Wait-KpaAndroid
         Ensure-KpaManager
     }
     Write-KpaSection 'Shell Root authorization' 'Shell Root 授权'
-    Write-Host 'A Shell superuser request may appear. Tap Allow. Waiting up to two minutes. ||| 掌机可能弹出 Shell 超级用户请求，请选择允许。最多等待两分钟。' -ForegroundColor Yellow
-    Write-Host 'Keep the screen unlocked. If no prompt appears, open Magisk > Superuser and allow Shell. ||| 保持屏幕解锁；若未弹出请求，请打开 Magisk → 超级用户，允许 Shell。'
-    $RootReady = $false
-    $RootTimer = [Diagnostics.Stopwatch]::StartNew()
-    while ($RootTimer.Elapsed.TotalSeconds -lt 120) {
-        $RootTest = Get-KpaProbe $Adb "-s $script:KpaSerial shell su -c id"
-        if ($RootTest -match 'uid=0') { $RootReady = $true; break }
-        Start-Sleep -Seconds 4
-    }
-    if (-not $RootReady) { throw 'Root authorization not granted / 未获得 Root 授权；请在 Magisk 中批准 Shell 后重试。' }
-
-    & $Adb push $ZygiskScript /data/local/tmp/enable_zygisk.sh | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw (Get-KpaText 'Failed to transfer the Zygisk setup script.' 'Zygisk 配置脚本传输失败。') }
-    & $Adb shell su -c 'chmod 755 /data/local/tmp/enable_zygisk.sh && /data/local/tmp/enable_zygisk.sh'
-    if ($LASTEXITCODE -ne 0) { throw 'Failed to enable Zygisk / 无法开启 Zygisk。' }
+    Write-KpaHint 'Keep the handheld unlocked. When Shell requests superuser access, tap Allow.' '保持掌机解锁；Shell 请求超级用户权限时点击“允许”。'
+    Write-KpaHint 'If no request appears, open Magisk > Superuser and allow Shell. The script waits and can retry.' '若没有弹窗，请打开 Magisk → 超级用户并允许 Shell；脚本会等待并支持重试。' DarkGray
+    Wait-KpaShellRoot
+    $ZygiskConfigured = Enable-KpaZygiskOptional
     & $Adb shell rm -f /data/local/tmp/enable_zygisk.sh
     Install-BundledModulesDisabled
-    Write-Host 'Rebooting to activate Zygisk / 正在重启以启用 Zygisk...'
+    Write-KpaSection 'Apply configuration' '应用配置'
+    Write-Host (Get-KpaText 'Rebooting to finish setup...' '正在重启以完成配置……')
     & $Adb reboot
     if ($LASTEXITCODE -ne 0) { throw (Get-KpaText 'Android reboot failed.' 'Android 重启失败。') }
     Wait-KpaAndroid
 
     Ensure-KpaManager
+    Wait-KpaShellRoot
     $FinalRoot = (& $Adb shell su -c id 2>&1 | Out-String)
-    & $Adb push $StatusScript /data/local/tmp/check_root_status.sh | Out-Null
+    Invoke-KpaAdbTransfer -TransferArguments @('push', $StatusScript, '/data/local/tmp/check_root_status.sh')
     if ($LASTEXITCODE -ne 0) { throw (Get-KpaText 'Status script transfer failed.' '状态检查脚本传输失败。') }
     $FinalStatus = Get-KpaProbe $Adb "-s $script:KpaSerial shell su -c 'sh /data/local/tmp/check_root_status.sh'"
     & $Adb shell rm -f /data/local/tmp/check_root_status.sh | Out-Null
     $Zygisk = $FinalStatus -match '(?m)^ZYGISK_PROCESS=running\s*$'
     if ($FinalRoot -notmatch 'uid=0') { throw 'Final root verification failed / 最终 Root 验证失败。' }
-    if (-not $Zygisk) { throw 'Zygisk process not detected; check Magisk / 未检测到 Zygisk 进程，请检查 Magisk。' }
+    if (-not $Zygisk) { Write-Host (Get-KpaText 'Zygisk is not running. Check Magisk settings; installed modules are retained.' 'Zygisk 未运行，请检查 Magisk 设置；已安装的模块会保留。') -ForegroundColor Yellow }
 
     Write-Host ''
-    Write-Host 'SUCCESS: Root, Magisk 30.7 and Zygisk are active / 成功：Root、Magisk 30.7、Zygisk 均已启用。' -ForegroundColor Green
+    Write-KpaSection 'Completed' '操作完成'
+    Write-Host (Get-KpaText 'Root and module installation completed.' 'Root 与模块安装完成。') -ForegroundColor Green
+    Write-Host ''
     Write-KpaStatus 'Active rooted slot' 'Root 活动槽' ("$Slot") Gray
     Write-KpaStatus 'Firmware' '固件' ("$FirmwareVersion") Gray
-    Write-KpaStatus 'Log' '日志' ("$Log") Gray
+    Write-Host ''
+    Write-Host (Get-KpaText 'Enable the modules you need in Magisk > Modules.' '请在 Magisk → 模块中启用需要的模块。')
+    Write-Host ''
+    Write-Host (Get-KpaText 'Log saved beside this script:' '日志已保存在脚本所在文件夹：')
+    Write-Host ('  ' + (Split-Path $Log -Leaf))
+    Write-Host ''
 }
 catch {
     Write-KpaSection 'Operation failed' '操作失败'

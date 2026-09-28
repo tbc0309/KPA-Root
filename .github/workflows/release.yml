@@ -27,6 +27,11 @@ jobs:
           ./Test-Monitor.ps1
           ./Test-Magisk.ps1
           ./Test-OtaBoot.ps1
+          ./tests/Test-BootLock.ps1
+          ./tests/Test-AdbTransfer.ps1
+          ./tests/Test-PostRoot.ps1
+          ./tests/Test-SafetyFlow.ps1
+          ./tests/Test-SlotAuthority.ps1
       - name: Select tag
         id: select
         shell: pwsh

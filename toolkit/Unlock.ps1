@@ -18,7 +18,12 @@ function Get-FastbootVar([string]$Name) {
 Start-Transcript -LiteralPath $Log | Out-Null
 try {
     Write-KpaBanner 'KONKR Pocket Advance - Bootloader Unlock' 'KONKR Pocket Advance - Bootloader 解锁'
-    Write-Host 'WARNING: Unlocking normally erases all user data. Back up first. / 警告：解锁通常会清除全部用户数据，请先完成备份。' -ForegroundColor Red
+    Write-Host (Get-KpaText 'WARNING: Unlocking normally erases all user data. Back up first.' '警告：解锁通常会清除全部用户数据，请先完成备份。') -ForegroundColor Red
+    Write-KpaSection 'What this script will do' '本脚本操作流程'
+    Write-KpaStep 1 4 'Check tools, install the USB driver, and wait for ADB authorization' '检查工具、安装 USB 驱动并等待 ADB 授权'
+    Write-KpaStep 2 4 'Read the device identity and current lock state' '读取设备身份与当前锁状态'
+    Write-KpaStep 3 4 'Ask twice before entering Fastboot and erasing data' '进入 Fastboot 和清除数据前进行两次确认'
+    Write-KpaStep 4 4 'Verify the unlocked state, restart, and wait for Android' '验证解锁状态、重启并等待 Android'
 
     Initialize-KpaUsbEnvironment -Adb $Adb -Fastboot $Fastboot | Out-Null
 
@@ -32,7 +37,7 @@ try {
     $Slot = (& $Adb shell getprop ro.boot.slot_suffix).Trim().TrimStart('_')
     $Serial = (& $Adb get-serialno).Trim()
     $BootState = (& $Adb shell getprop ro.boot.verifiedbootstate).Trim()
-    $FlashLocked = (& $Adb shell getprop ro.boot.flash.locked).Trim()
+    $FlashLocked = Get-KpaBootLock
     if ($Model -ne 'GT78-VN' -or $Device -ne 'GT78-VN' -or $Board -ne 'k85v1_64') {
         throw 'Unsupported hardware; refusing to unlock / 设备型号不匹配，拒绝执行解锁。'
     }
@@ -50,12 +55,11 @@ try {
     Write-KpaStatus 'Flash locked' '锁状态' ("$FlashLocked") Yellow
 
     if ($FlashLocked -eq '0') {
-        Write-KpaSection 'Already unlocked' 'Bootloader 已解锁'
-        Write-Host 'No action is needed. Exiting without rebooting. ||| 无需继续操作，直接退出，不重启掌机。' -ForegroundColor Green
-        exit 0
-    }
-    if ($FlashLocked -ne '1') {
-        throw (Get-KpaText 'Unable to verify the lock state. Stopping.' '无法确认锁状态，已停止操作。')
+        Write-KpaHint 'Android reports an unlocked bootloader. Fastboot will verify it before the script exits.' 'Android 显示 Bootloader 已解锁；脚本仍将在 Fastboot 中确认后再退出。' Yellow
+    } elseif ($FlashLocked -eq '1') {
+        Write-KpaHint 'Android reports a locked bootloader. Fastboot will verify it before any unlock command.' 'Android 显示 Bootloader 已锁定；发送解锁命令前会在 Fastboot 中再次确认。' Yellow
+    } else {
+        Write-KpaHint 'Android did not expose a reliable lock state. Fastboot will verify it before any unlock command.' 'Android 未提供可靠的锁状态；发送解锁命令前会在 Fastboot 中确认。' Yellow
     }
 
     if ($PreflightOnly) {
@@ -64,8 +68,7 @@ try {
         exit 0
     }
 
-    $Proceed = Read-Host 'Type CONTINUE to enter Bootloader; anything else cancels ||| 输入 CONTINUE 进入 Bootloader，其他输入取消'
-    if ($Proceed -cne 'CONTINUE') { exit 0 }
+    if (-not (Read-KpaYes 'Enter Bootloader?' '进入 Bootloader？')) { exit 0 }
     Write-Host 'Rebooting to bootloader / 正在重启到 Bootloader...'
     & $Adb reboot bootloader
     if ($LASTEXITCODE -ne 0) { throw (Get-KpaText 'Failed to enter Bootloader.' '无法进入 Bootloader，已停止。') }
@@ -87,13 +90,13 @@ try {
         throw (Get-KpaText 'Fastboot lock state is unknown. Unlock command was not sent.' 'Fastboot 锁状态不明，未发送解锁命令。')
     }
     Write-Host 'DATA WIPE: The command may take effect immediately without another on-device prompt. ||| 清除数据：命令可能立即生效，掌机不一定再次弹出确认。' -ForegroundColor Red
-    $Confirm = Read-Host 'Type UNLOCK to erase data and continue / 输入 UNLOCK 确认清除数据并继续'
-    if ($Confirm -cne 'UNLOCK') {
+    if (-not (Read-KpaYes 'Erase user data and unlock the bootloader?' '清除用户数据并解锁 Bootloader？')) {
         & $Fastboot -s $script:KpaSerial reboot | Out-Null
         throw 'Cancelled safely; rebooting Android / 已安全取消，正在重启 Android。'
     }
 
     Write-Host 'If prompted, select YES with Volume Up (MODE to the right of L2). ||| 如出现确认界面，按音量+（L2 右侧 MODE）选择 YES。' -ForegroundColor Yellow
+    Write-KpaHint 'The command may complete without showing a confirmation screen. The script will verify the result automatically.' '命令也可能不显示确认界面而直接完成；脚本会自动验证最终结果。' DarkGray
     & $Fastboot -s $script:KpaSerial flashing unlock
     if ($LASTEXITCODE -ne 0) { throw 'fastboot flashing unlock failed / Fastboot 解锁命令失败。' }
 
