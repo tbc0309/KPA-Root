@@ -1,0 +1,17 @@
+@{
+    Api = ''
+    Sign = ''
+    TargetPattern = '^BUILD_(\d{8})_'
+    DeviceType = ''
+    ConnectType = ''
+    Platform = ''
+    Project = ''
+    DevicesInfoExt = ''
+    Fingerprint = ''
+    SdkLevel = ''
+    SdkRelease = ''
+    Resolution = ''
+    AppVersion = ''
+    AppCode = ''
+    SendId = ''
+}

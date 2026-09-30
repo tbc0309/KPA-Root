@@ -1,5 +1,5 @@
-$ErrorActionPreference = 'Stop'
-. "$PSScriptRoot\..\toolkit\KPA.PostRoot.ps1"
+﻿$ErrorActionPreference = 'Stop'
+. "$PSScriptRoot\..\toolkit\scripts\PostRoot.ps1"
 $Adb = (Get-Process -Id $PID).Path
 foreach ($code in @(0, 7)) {
     Invoke-KpaAdbTransfer -TransferArguments @('-NoProfile', '-Command', "[Console]::Error.WriteLine('1 file pushed'); exit $code")

@@ -1,0 +1,6 @@
+@{
+    Preinstall = @(
+        'playintegrityfix'
+        'zygisk_shamiko'
+    )
+}

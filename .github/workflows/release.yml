@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag, for example v1.0.1
+        description: Release tag, for example v1.1.0
         required: true
 
 permissions:
@@ -21,17 +21,6 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate scripts
-        shell: powershell
-        run: |
-          ./Test-Monitor.ps1
-          ./Test-Magisk.ps1
-          ./Test-OtaBoot.ps1
-          ./tests/Test-BootLock.ps1
-          ./tests/Test-AdbTransfer.ps1
-          ./tests/Test-PostRoot.ps1
-          ./tests/Test-SafetyFlow.ps1
-          ./tests/Test-SlotAuthority.ps1
       - name: Select tag
         id: select
         shell: pwsh
@@ -46,9 +35,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: ./scripts/Fetch-Modules.ps1
-      - name: Build Root package
+      - name: Validate scripts
+        shell: powershell
+        run: |
+          Get-ChildItem ./tests/Test-*.ps1 | Sort-Object Name | ForEach-Object { & $_.FullName }
+      - name: Build device packages
         shell: pwsh
-        run: ./build-release.ps1 -Version ('${{ steps.select.outputs.tag }}' -replace '^v','') -SkipModuleDownload
+        run: |
+          $Version = '${{ steps.select.outputs.tag }}' -replace '^v',''
+          ./build-release.ps1 -Version $Version -SkipModuleDownload
+          ./scripts/Build-AirMiniTest.ps1 -Version $Version
       - name: Publish release
         shell: pwsh
         env:

@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([Parameter(Mandatory)][string]$OutputDir)
 $ErrorActionPreference = 'Stop'
 # Keep the reviewed UI fix rather than downloading an unpatched module.

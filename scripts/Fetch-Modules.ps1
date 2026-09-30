@@ -1,11 +1,13 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$Repository = 'tbc0309/KPA-Modules',
     [string]$OutputDir
 )
 
 $ErrorActionPreference = 'Stop'
-if (-not $OutputDir) { $OutputDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'toolkit/modules' }
+if ($PSVersionTable.PSVersion -lt [version]'5.1') { throw 'Windows PowerShell 5.1 or later is required.' }
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+if (-not $OutputDir) { $OutputDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'toolkit/packages/modules' }
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 $Headers = @{ 'User-Agent' = 'KPA-Root-Release-Builder' }
 if ($env:GITHUB_TOKEN) { $Headers.Authorization = "Bearer $env:GITHUB_TOKEN" }

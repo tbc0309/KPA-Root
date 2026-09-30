@@ -1,5 +1,5 @@
-$ErrorActionPreference = 'Stop'
-. "$PSScriptRoot\..\toolkit\KPA.PostRoot.ps1"
+﻿$ErrorActionPreference = 'Stop'
+. "$PSScriptRoot\..\toolkit\scripts\PostRoot.ps1"
 function Get-KpaText($English, $Chinese) { return $English }
 function Start-Sleep { param($Seconds) }
 function Mock-Adb { $global:LASTEXITCODE = 0 }
@@ -30,5 +30,5 @@ function Get-KpaProbe { $script:probes++; if ($script:probes -ge 3) { return 'ui
 Wait-KpaShellRoot
 Check 'Delayed Root authorization' ($script:probes -eq 3)
 $tokens=$null; $errors=$null
-[void][Management.Automation.Language.Parser]::ParseFile("$PSScriptRoot\..\toolkit\Root.ps1",[ref]$tokens,[ref]$errors)
+[void][Management.Automation.Language.Parser]::ParseFile("$PSScriptRoot\..\toolkit\scripts\Root.ps1",[ref]$tokens,[ref]$errors)
 Check 'Root script parses' ($errors.Count -eq 0)

@@ -1,6 +1,7 @@
 /dist/
-/toolkit/modules/*.zip
-/toolkit/*_Log_*.txt
-/toolkit/ota-cache/
-/toolkit/generated-stock-boots.json
-/toolkit/generated-patched-boots.json
+/toolkit/packages/modules/*.zip
+/toolkit/logs/
+/toolkit/devices/*/ota/cache/
+/toolkit/devices/*/ota/generated-stock-boots.json
+/toolkit/devices/*/ota/generated-patched-boots.json
+/toolkit/devices/*/images/boot_*_magisk_*.img

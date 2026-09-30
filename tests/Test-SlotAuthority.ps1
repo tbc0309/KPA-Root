@@ -1,6 +1,6 @@
-$ErrorActionPreference = 'Stop'
-$Root = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\toolkit\Root.ps1') -Raw
-$Restore = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\toolkit\Restore.ps1') -Raw
+﻿$ErrorActionPreference = 'Stop'
+$Root = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\toolkit\scripts\Root.ps1') -Raw
+$Restore = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\toolkit\scripts\Restore.ps1') -Raw
 
 foreach ($Item in @(@('Root', $Root), @('Restore', $Restore))) {
     $Name = $Item[0]

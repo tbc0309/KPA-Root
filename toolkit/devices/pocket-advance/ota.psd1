@@ -1,0 +1,17 @@
+﻿@{
+    Api = 'https://fota5p.adups.com/otainter-5.0/fota5'
+    Sign = '50f0c23cbdc67a512562752e48b33828'
+    TargetPattern = '^BW03_(\d{8})_'
+    DeviceType = 'pad'
+    ConnectType = '-2'
+    Platform = 'MTK_7400_12.0'
+    Project = 'ayaneo$7400$12.0_KONKR Pocket Advance_en-US_other'
+    DevicesInfoExt = 'GT78-VN_ARBOR_GT78-VN_GT78-VN_k85v1$64_ARBOR__'
+    Fingerprint = 'ARBOR/GT78-VN/GT78-VN:11/RP1A.200720.011/mp1V95182:user/release-keys'
+    SdkLevel = '31'
+    SdkRelease = '12'
+    Resolution = '960#640'
+    AppVersion = '5.30.1.237083.006_2025-07-25 10:56'
+    AppCode = '216'
+    SendId = '1075259712158'
+}

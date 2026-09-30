@@ -2,9 +2,9 @@
 
 [English](README.en.md) | [简体中文](README.md)
 
-Bootloader unlock, Root and restore toolkit for KONKR Pocket Advance.
+Bootloader unlock, Root, stock-boot restore, and post-OTA patching toolkit primarily developed for **KONKR Pocket Advance (KPA)**, with Chinese and English documentation and launchers.
 
-Chinese and English documentation and launchers are available.
+KPA has completed hardware Root testing across multiple firmware versions, restore preflight testing, and two consecutive official OTA automatic-patching cycles. Before any write, the toolkit verifies device identity, firmware, active slot, bootloader state, and image hashes. It can also reconstruct a missing stock boot through official adjacent incremental OTAs.
 
 > [!CAUTION]
 > This toolkit can reconstruct and patch boot images from official incremental OTAs, so it will generally support later official firmware without waiting for a toolkit update. When a new OTA is available, first run `3_Restore_EN.cmd` to restore the stock boot for the current system. Complete the official OTA, then run `2_Root_EN.cmd` to restore Root on the updated system. Using the **KPA Tools Root edition** is recommended: before the OTA, open Root Manager and select **Prepare for OTA**. After preparation completes, install the official OTA normally; KPA Root Helper will automatically patch and verify Root for the updated system.
@@ -18,26 +18,33 @@ Chinese and English documentation and launchers are available.
 
 ## Supported devices
 
-- Model: `GT78-VN`
-- Board: `k85v1_64`
-- Firmware: bundled for `BW03_20260730`, `BW03_20260813` and `BW03_20260828`; boot images can be generated for later official incremental builds
-- Root: Magisk 30.7 with Zygisk
-- Host: Windows; ADB and Fastboot are included
+KONKR Pocket Advance is the primary supported device. At community request, the project also provides an AYANEO Pocket AIR Mini `TEST` package so owners of that device can help validate it.
+
+> [!WARNING]
+> **The AIR Mini test package has not been tested on AIR Mini hardware for unlocking, Root flashing, restore, physical-button behavior, or module operation.** Only official factory packages, stock-boot hashes, OTA parameters, the incremental chain, and boot reconstruction have been checked offline. It is not verified production support; back up all data and keep the official full-flash package and recovery tools ready before testing.
+
+| Device | Firmware and validation | Preinstalled modules |
+| --- | --- | --- |
+| KONKR Pocket Advance | Stock boot for 0730, 0813 and 0828; hardware-tested Root, restore preflight and automatic OTA patching | Font, RGB, Play Integrity Fork, Shamiko and Dolby Atmos |
+| AYANEO Pocket AIR Mini | **Experimental; Root and restore have not been hardware-tested**. Stock boots for 1020, 1027, 1030, 1103, 1110 and 1125; OTA chain and images verified offline only | Play Integrity Fork and Shamiko (static compatibility review only) |
+
+Root uses Magisk 30.7 with Zygisk. The host is Windows; ADB, Fastboot and the USB driver are included. Magisk boot is not bundled and is generated and verified from the matching stock boot during Root.
 
 Before any change, the scripts verify the model, firmware, active slot, bootloader state, image size and SHA-256. Root and restore operations target only the active slot; the user never selects A or B manually.
 
-## Buttons and boot modes
+## Before you start
 
-- While powered off, hold Power + `MODE` to open the boot-mode menu.
-- Press `MODE` to cycle through `Recovery Mode`, `Fastboot Mode` and `Normal Mode`, then press `LC` to confirm.
-- In Recovery, use the volume wheel to move up or down; `MODE` can also cycle through the choices. Press Power to confirm.
-- Fastboot Volume Up / YES corresponds to the `MODE` button to the right of `L2`.
+- Use Windows 10 or Windows 11, keep the handheld charged, and maintain a stable USB connection.
+- Back up all important data. Unlocking the bootloader normally erases user data.
+- Open **Settings → System → Developer options**, enable **OEM unlocking** and **USB debugging**, and disable **Verify apps over USB**.
+- Then open **Settings → Security**, disable **Google Play Protect**, connect the PC, and authorize USB debugging.
+- AIR Mini testers should also prepare the official full-flash package. Stop immediately on an identity mismatch, failed verification, slot mismatch, or unknown state.
 
 ## Workflow
 
 ### 1. Unlock the bootloader
 
-On the handheld, open **Settings → System → Developer options**, enable **OEM unlocking** and **USB debugging**, and authorize this computer.
+Complete the **Before you start** checklist above and keep the handheld unlocked with its screen visible.
 
 Run `1_Unlock_EN.cmd`.
 
@@ -51,19 +58,17 @@ Check the firmware version again before flashing.
 
 The script always reuses and verifies an existing image first. Only when the current firmware image is missing, it queries and downloads official adjacent incremental OTAs, reconstructs the current stock boot from an earlier stock boot, and patches it with the bundled Magisk 30.7. After preflight and user confirmation, it flashes only the active slot, installs Magisk, enables Zygisk and verifies Root.
 
-Automatic generation requires Internet access, a complete official incremental chain and a working ADB connection. OTA archives retain their server filenames under `ota-cache`. Existing 0730, 0813 and 0828 images are never regenerated or overwritten.
+Automatic generation requires Internet access, a complete official incremental chain and a working ADB connection. OTA archives retain their server filenames under the matching `devices/<device>/ota/cache` directory. Existing stock boot images are never regenerated or overwritten.
 
-The package also includes:
-
-- KPA MYuppy Font
-- KPA RGB Control
-- Play Integrity Fork
-- Shamiko
-- Dolby Atmos Razer Phone 2 (landscape graphical equalizer fix)
+Each device's `modules.psd1` controls its module allowlist. Pocket Advance uses all five modules. The AIR Mini test profile selects only Play Integrity Fork and Shamiko; the KPA-specific RGB, font and Dolby modules are not installed. The two selected modules have not been run on AIR Mini hardware.
 
 Missing modules are installed with a Magisk `disable` marker, so they remain disabled by default. Existing installations are skipped without changing their state. Enable a module manually in Magisk and reboot when needed.
 
-### Dolby Atmos
+### Module notes
+
+#### Dolby Atmos
+
+Included only in the Pocket Advance module allowlist.
 
 Upstream project：[Dolby Atmos Razer Phone 2](https://github.com/reiryuki/Dolby-Atmos-Razer-Phone2-Magisk-Module)
 
@@ -86,7 +91,7 @@ The script restores the stock boot matching the current firmware and active slot
 > [!WARNING]
 > Relocking the bootloader is not recommended. Restoring stock boot alone cannot prove that every other partition is official and unmodified. Relocking with a mismatched or modified partition may prevent the device from booting.
 
-## OTA workflow
+## OTA and later system updates
 
 ### Using KPA-Root scripts only
 
@@ -99,7 +104,7 @@ Never flash a patched boot from an older firmware into a newer build.
 
 ### Using KPA Tools Root edition
 
-The [KPA Tools Root edition](https://github.com/tbc0309/KPA-Tools/releases/latest) is recommended. KPA Root Helper restores the active slot's stock boot before System Update, then backs up, patches, and verifies the new slot after the official OTA while keeping the old slot on its matching stock boot. Restart only after the green **Ready to restart** notice appears on the System Update screen.
+The [KPA Tools Root edition](https://github.com/tbc0309/KPA-Tools/releases/latest) is recommended for KONKR Pocket Advance. KPA Root Helper restores the active slot's stock boot before System Update, then backs up, patches, and verifies the new slot after the official OTA while keeping the old slot on its matching stock boot. Restart only after the green **Ready to restart** notice appears on the System Update screen. This automated flow is not currently claimed as verified for AIR Mini.
 
 ![KPA Tools Root Manager](docs/images/kpa-tools-root-manager.png)
 
@@ -115,7 +120,7 @@ The [KPA Tools Root edition](https://github.com/tbc0309/KPA-Tools/releases/lates
 The download pages directly list the KONKR Pocket Advance flashing tools, instructions, and Fastboot ROM. The Chinese page includes the flashing-tool guide and 0730 package; the English page lists the 0730 Fastboot ROM.
 
 > [!WARNING]
-The official download is an MTK Fastboot flashing package, not an in-system card-update OTA. It writes multiple partitions and may erase data. Follow the matching official tool and instructions exactly, and never disconnect USB while flashing.
+> The official download is an MTK Fastboot flashing package, not an in-system card-update OTA. It writes multiple partitions and may erase data. Follow the matching official tool and instructions exactly, and never disconnect USB while flashing.
 
 ### Flashing mode
 
@@ -127,11 +132,25 @@ The official package provides the A-slot boot partitions. `Download Only` does n
 
 An official line flash may leave equal A/B priorities in `misc`. KPA-Root does not use those priorities to select a flash target: it reads the slot currently running Android, then verifies Fastboot `current-slot` before allowing the operation to continue.
 
+## Buttons and boot modes
+
+The following boot-mode and physical-button flow is verified on **KONKR Pocket Advance**:
+
+- While powered off, hold Power + `MODE` to open the boot-mode menu.
+- Press `MODE` to cycle through `Recovery Mode`, `Fastboot Mode` and `Normal Mode`, then press `LC` to confirm.
+- In Recovery, use the volume wheel to move up or down; `MODE` can also cycle through the choices. Press Power to confirm.
+- Press Volume Up (`MODE` to the right of `L2`) to select `YES`.
+
+For AIR Mini, the script displays **Press Volume Up to select `YES`**. Neither that prompt nor the physical-button behavior has been verified on AIR Mini hardware; follow the instructions shown by the device bootloader.
+
 ## Release builds
 
 Font, RGB, Play Integrity Fork and Shamiko are downloaded from upstream stable releases. Dolby uses the pinned UI fix archive with SHA-256 verification. Building requires 7-Zip; running the toolkit does not.
 
-See [`toolkit/README_EN.md`](toolkit/README_EN.md) for the complete English guide.
+- `build-release.ps1 -Version 1.1.0` creates the stable KONKR Pocket Advance-only archive.
+- `scripts/Build-AirMiniTest.ps1 -Version 1.1.0` creates the AYANEO Pocket AIR Mini-only `TEST` archive and applies the profile-specific archive name and six launcher window titles automatically.
+
+See [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md) for the repository and device-profile layout.
 
 Copyright © 2026 IMNKS.COM.
 

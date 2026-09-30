@@ -1,0 +1,12 @@
+@{
+    Id = 'vendor-model'
+    Name = 'Vendor Model'
+    Models = @('ANDROID_MODEL')
+    Devices = @('ANDROID_DEVICE')
+    Boards = @('ANDROID_BOARD')
+    FastbootProductPattern = '^FASTBOOT_PRODUCT$'
+    SerialPattern = '^SERIAL_PATTERN$'
+    BuildPattern = '^BUILD_(\d{8})(?:_|$)'
+    BootSize = 33554432
+    ImageDirectory = 'images'
+}

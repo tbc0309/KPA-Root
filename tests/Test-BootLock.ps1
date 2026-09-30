@@ -1,5 +1,5 @@
-$ErrorActionPreference = 'Stop'
-. "$PSScriptRoot\..\toolkit\KPA.Common.ps1"
+﻿$ErrorActionPreference = 'Stop'
+. "$PSScriptRoot\..\toolkit\scripts\Common.ps1"
 $Cases = @(
     @('androidboot.vbmeta.device_state=unlocked androidboot.verifiedbootstate=orange', '0'),
     @('androidboot.vbmeta.device_state=locked', '1'),

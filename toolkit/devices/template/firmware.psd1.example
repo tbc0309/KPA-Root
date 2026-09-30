@@ -1,0 +1,5 @@
+@{
+    Entries = @(
+        @{ Date='YYYYMMDD'; Short='MMDD'; Server='SERVER_VERSION'; StockHash='SHA256' }
+    )
+}
