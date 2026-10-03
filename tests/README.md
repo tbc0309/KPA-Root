@@ -6,6 +6,7 @@ Every `Test-*.ps1` file is independent and must pass in both Windows PowerShell 
 | --- | --- |
 | `Test-AdbTransfer.ps1` | Native stderr and exit-code preservation during ADB transfers |
 | `Test-BootLock.ps1` | Trusted bootloader-state parsing and ambiguous-state rejection |
+| `Test-BundledBoots.ps1` | Nine offline stock/patched image pairs without runtime indexes; corrupt patched-image rejection |
 | `Test-DeviceProfiles.ps1` | Device identity, firmware tables, module allowlists and confirmation-key hints |
 | `Test-LayoutAndAssets.ps1` | Toolkit layout, required tools, stock boot sizes and SHA-256 hashes |
 | `Test-Magisk.ps1` | Manager repair policy and CRLF-safe Magisk status parsing |

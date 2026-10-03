@@ -9,13 +9,13 @@ $Cases = @(
         Id = 'pocket-advance'; Serial = 'BW0308G250005012'; Build = 'BW03_20260828_20260827-2100'
         FirmwareCount = 3; Modules = @('kpa_myuppy_font','kpa_rgb_control','playintegrityfix','zygisk_shamiko','DolbyAtmos')
         ConfirmKeyCn = '音量+（L2 右侧 MODE）'
-        ImageKinds = @('stock')
+        ImageKinds = @('stock','magisk_30.7')
     },
     @{
         Id = 'air-mini'; Serial = 'BW02092211000027'; Build = 'MP40AY2-20251125_20251125-1717'
         FirmwareCount = 6; Modules = @('playintegrityfix','zygisk_shamiko')
         ConfirmKeyCn = '音量+'
-        ImageKinds = @('stock')
+        ImageKinds = @('stock','magisk_30.7')
     }
 )
 

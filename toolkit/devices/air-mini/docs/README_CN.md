@@ -41,7 +41,7 @@
 
 ## 镜像与模块
 
-Root 时会根据当前系统现场生成并校验 Magisk boot，不携带预制修补镜像。包内只提供 Play Integrity Fork 和 Shamiko，安装后默认停用；不包含 Pocket Advance 专用的字体、RGB 和杜比模块。
+内置 1020、1027、1030、1103、1110、1125 的原版及 Magisk 30.7 修补 boot，已知版本获取 Root 或恢复时无需下载 OTA。镜像已完成生成与完整性校验，但尚未在 AIR Mini 真机刷写启动。后续未内置版本仍需联网通过官方连续增量 OTA 合成。包内只提供 Play Integrity Fork 和 Shamiko，安装后默认停用；不包含 Pocket Advance 专用的字体、RGB 和杜比模块。
 
 上述两个模块只完成了静态兼容性审查，尚未在 AIR Mini 实机运行。详细依据见 [`MODULE_COMPATIBILITY_CN.md`](MODULE_COMPATIBILITY_CN.md)。
 

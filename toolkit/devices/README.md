@@ -18,7 +18,7 @@ Runtime profile contents:
 - `firmware.psd1`: supported firmware versions and verified stock boot hashes.
 - `ota.psd1`: model-specific official OTA request parameters.
 - `modules.psd1`: explicit preinstall module allowlist; an empty list is valid.
-- `images/`: verified stock boot images and checksums. Magisk boot images are generated on demand.
+- `images/`: verified stock and Magisk 30.7 patched boot images and checksums for catalog builds. Future builds are generated on demand.
 - `ota/`: model-specific OTA cache and generated image indexes when required.
 - `docs/`: model-specific Chinese and English instructions.
 

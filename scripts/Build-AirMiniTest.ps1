@@ -4,6 +4,7 @@ param([Parameter(Mandatory)][string]$Version)
 $ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $Toolkit = Join-Path $ProjectRoot 'toolkit'
+. (Join-Path $PSScriptRoot 'Prepare-BootAssets.ps1')
 $Dist = Join-Path $ProjectRoot 'dist'
 $Stage = Join-Path $Dist '.stage-air-mini-test'
 $DeviceConfig = Import-PowerShellDataFile -LiteralPath (Join-Path $Toolkit 'devices\air-mini\device.psd1')
@@ -61,7 +62,9 @@ try {
         $Target = Join-Path $Stage $Relative
         if (Test-Path -LiteralPath $Target) { Remove-Item -LiteralPath $Target -Recurse -Force }
     }
-    Get-ChildItem -LiteralPath (Join-Path $Stage 'devices') -Recurse -File -Filter 'boot_*_magisk_*.img' | Remove-Item -Force
+    # 已知版本随包提供；生成校验不代表 AIR Mini 实机启动验证。
+    # Bundle known images; integrity checks do not imply AIR Mini boot validation.
+    Initialize-KpaReleaseBootAssets (Join-Path $Stage 'devices/air-mini')
 
     $Profiles = @(Get-ChildItem -LiteralPath (Join-Path $Stage 'devices') -Directory)
     if ($Profiles.Count -ne 1 -or $Profiles[0].Name -ne 'air-mini') {
@@ -70,9 +73,6 @@ try {
     $Modules = @(Get-ChildItem -LiteralPath (Join-Path $Stage 'packages\modules') -File -Filter '*.zip' | Select-Object -ExpandProperty Name | Sort-Object)
     if (($Modules -join ',') -ne 'PlayIntegrityFork.zip,Shamiko.zip') {
         throw "AIR Mini package contains unexpected modules: $($Modules -join ', ')"
-    }
-    if (Get-ChildItem -LiteralPath $Stage -Recurse -File -Filter 'boot_*_magisk_*.img') {
-        throw 'Prebuilt Magisk boot must not be included.'
     }
     foreach ($Launcher in $LauncherTitles.GetEnumerator()) {
         $LauncherPath = Join-Path $Stage $Launcher.Key

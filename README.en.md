@@ -25,10 +25,10 @@ KONKR Pocket Advance is the primary supported device. At community request, the 
 
 | Device | Firmware and validation | Preinstalled modules |
 | --- | --- | --- |
-| KONKR Pocket Advance | Stock boot for 0730, 0813 and 0828; hardware-tested Root, restore preflight and automatic OTA patching | Font, RGB, Play Integrity Fork, Shamiko and Dolby Atmos |
-| AYANEO Pocket AIR Mini | **Experimental; Root and restore have not been hardware-tested**. Stock boots for 1020, 1027, 1030, 1103, 1110 and 1125; OTA chain and images verified offline only | Play Integrity Fork and Shamiko (static compatibility review only) |
+| KONKR Pocket Advance | Stock and Magisk 30.7 patched boots for 0730, 0813 and 0828; hardware-tested Root, restore preflight and automatic OTA patching | Font, RGB, Play Integrity Fork, Shamiko and Dolby Atmos |
+| AYANEO Pocket AIR Mini | **Experimental; Root and restore have not been hardware-tested**. Stock and Magisk 30.7 patched boots for 1020, 1027, 1030, 1103, 1110 and 1125; OTA chain and images verified offline only | Play Integrity Fork and Shamiko (static compatibility review only) |
 
-Root uses Magisk 30.7 with Zygisk. The host is Windows; ADB, Fastboot and the USB driver are included. Magisk boot is not bundled and is generated and verified from the matching stock boot during Root.
+Root uses Magisk 30.7 with Zygisk. The host is Windows; ADB, Fastboot and the USB driver are included. Both stock and patched boots are bundled for the known builds above, so Root and stock-boot restore do not require OTA downloads. Later unbundled builds can still be reconstructed and patched through a continuous official incremental OTA chain; this requires Internet access.
 
 Before any change, the scripts verify the model, firmware, active slot, bootloader state, image size and SHA-256. Root and restore operations target only the active slot; the user never selects A or B manually.
 
@@ -58,7 +58,7 @@ Check the firmware version again before flashing.
 
 The script always reuses and verifies an existing image first. Only when the current firmware image is missing, it queries and downloads official adjacent incremental OTAs, reconstructs the current stock boot from an earlier stock boot, and patches it with the bundled Magisk 30.7. After preflight and user confirmation, it flashes only the active slot, installs Magisk, enables Zygisk and verifies Root.
 
-Automatic generation requires Internet access, a complete official incremental chain and a working ADB connection. OTA archives retain their server filenames under the matching `devices/<device>/ota/cache` directory. Existing stock boot images are never regenerated or overwritten.
+OTA reconstruction for unbundled builds requires Internet access, a complete official incremental chain and a working ADB connection. OTA archives retain their server filenames under the matching `devices/<device>/ota/cache` directory. Existing stock boot images are never regenerated or overwritten.
 
 Each device's `modules.psd1` controls its module allowlist. Pocket Advance uses all five modules. The AIR Mini test profile selects only Play Integrity Fork and Shamiko; the KPA-specific RGB, font and Dolby modules are not installed. The two selected modules have not been run on AIR Mini hardware.
 

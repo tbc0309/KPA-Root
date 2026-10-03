@@ -5,3 +5,12 @@
 /toolkit/devices/*/ota/generated-stock-boots.json
 /toolkit/devices/*/ota/generated-patched-boots.json
 /toolkit/devices/*/images/boot_*_magisk_*.img
+!/toolkit/devices/pocket-advance/images/boot_0730_magisk_30.7.img
+!/toolkit/devices/pocket-advance/images/boot_0813_magisk_30.7.img
+!/toolkit/devices/pocket-advance/images/boot_0828_magisk_30.7.img
+!/toolkit/devices/air-mini/images/boot_1020_magisk_30.7.img
+!/toolkit/devices/air-mini/images/boot_1027_magisk_30.7.img
+!/toolkit/devices/air-mini/images/boot_1030_magisk_30.7.img
+!/toolkit/devices/air-mini/images/boot_1103_magisk_30.7.img
+!/toolkit/devices/air-mini/images/boot_1110_magisk_30.7.img
+!/toolkit/devices/air-mini/images/boot_1125_magisk_30.7.img

@@ -18,10 +18,10 @@ toolkit/
   devices/
     pocket-advance/
       device.psd1       # identity, hardware rules and per-device release names
-      firmware.psd1     # versions and verified stock hashes
+      firmware.psd1     # versions and verified stock/patched hashes
       ota.psd1          # official OTA request parameters
       modules.psd1      # preinstall allowlist
-      images/           # verified stock boot images and checksums
+      images/           # verified stock/patched boot images and checksums
       ota/              # runtime OTA cache and generated-image indexes
       docs/             # device-specific bilingual documentation
     air-mini/
@@ -34,7 +34,7 @@ toolkit/
       docs/
 ```
 
-Folder names use short, stable model identifiers. To add another model, copy `toolkit/devices/template`, create the four `.psd1` parameter tables, add verified stock boot images and update the model documentation. Magisk boot images, logs and OTA caches are runtime output and are excluded from releases.
+Folder names use short, stable model identifiers. To add another model, copy `toolkit/devices/template`, create the four `.psd1` parameter tables, add verified stock boot images and update the model documentation. Catalog stock and Magisk 30.7 patched images are included in releases and checked against `firmware.psd1`. Unknown runtime images, logs and OTA caches are excluded.
 
 Each profile document must clearly separate:
 

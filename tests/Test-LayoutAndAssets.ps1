@@ -57,6 +57,11 @@ foreach ($Image in $PatchedImages) {
     if ($Image.Name -notmatch '^boot_([0-9]{4}|[0-9]{8})_magisk_[0-9.]+\.img$') { throw "Invalid generated boot name: $($Image.Name)" }
     $Version = $Matches[1]
     if ($Image.Length -ne $Profile.BootSize) { throw "Generated boot size mismatch: $($Image.FullName)" }
+    $CatalogEntry = $Profile.Firmware | Where-Object Short -eq $Version | Select-Object -First 1
+    if ($CatalogEntry -and $CatalogEntry.PatchedHash) {
+        if ((Get-FileHash -LiteralPath $Image.FullName -Algorithm SHA256).Hash -ne $CatalogEntry.PatchedHash) { throw "Bundled boot hash mismatch: $($Image.FullName)" }
+        continue
+    }
     $IndexFile = Join-Path $Profile.ProfileRoot 'ota\generated-patched-boots.json'
     if (-not (Test-Path -LiteralPath $IndexFile -PathType Leaf)) { throw "Generated boot index is missing: $($Image.FullName)" }
     $Record = @(Get-Content -LiteralPath $IndexFile -Raw | ConvertFrom-Json) | Where-Object Version -eq $Version | Select-Object -First 1
@@ -65,5 +70,5 @@ foreach ($Image in $PatchedImages) {
 }
 
 $BuildScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\build-release.ps1') -Raw
-if ($BuildScript -notmatch "boot_\*_magisk_\*\.img") { throw 'Release build does not exclude runtime-patched boot images.' }
+if ($BuildScript -notmatch 'Initialize-KpaReleaseBootAssets') { throw 'Release build does not verify bundled boot images.' }
 Write-Output 'PASS: toolkit layout, runtime paths, parameter tables, stock images and generated-image records'

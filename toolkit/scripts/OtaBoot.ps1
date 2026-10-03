@@ -158,7 +158,11 @@ function Ensure-KpaPatchedBoot {
     $StateRoot=Join-Path $script:KpaDeviceProfile.ProfileRoot 'ota'; New-Item -ItemType Directory -Force -Path $StateRoot|Out-Null
     if(Test-Path $Output){
         if((Get-Item $Output).Length -ne 33554432){throw "Existing patched boot has invalid size: $Output"}
+        # 优先校验随包镜像的固定哈希，未知版本再使用生成记录。
+        # Prefer the bundled catalog hash; use runtime records for future builds.
+        $CatalogEntry=$script:KpaDeviceProfile.Firmware|Where-Object Short -eq $Stock.Version|Select-Object -First 1
         $RecordedHash=Get-KpaRecordedPatchedHash $StateRoot $Stock.Version
+        if($CatalogEntry -and $CatalogEntry.PatchedHash){$RecordedHash=[string]$CatalogEntry.PatchedHash}
         if($RecordedHash -and (Get-FileHash $Output -Algorithm SHA256).Hash -ine $RecordedHash){throw "Existing patched boot SHA256 mismatch: $Output"}
         return $Output
     }

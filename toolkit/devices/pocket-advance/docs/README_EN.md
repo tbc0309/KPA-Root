@@ -9,7 +9,7 @@
 
 - Model: `GT78-VN`
 - Board: `k85v1_64`
-- Firmware: stock boot images for `BW03_20260730`, `BW03_20260813` and `BW03_20260828`; Magisk boot is generated during Root, and later builds can be reconstructed from a continuous official incremental OTA chain
+- Firmware: stock and Magisk 30.7 patched boot images for `BW03_20260730`, `BW03_20260813` and `BW03_20260828`; these builds need no OTA download, and later builds can be reconstructed from a continuous official incremental OTA chain
 - Root solution: Magisk 30.7 with Zygisk
 
 Scripts display device, firmware, lock state and target partition, select the active slot, and verify image hashes. Unsupported devices or mismatched firmware are not flashed.

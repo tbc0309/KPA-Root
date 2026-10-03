@@ -25,10 +25,10 @@ KONKR Pocket Advance 是本项目的主要支持机型。应网友需求，项�
 
 | 机型 | 固件与验证状态 | 预装模块 |
 | --- | --- | --- |
-| KONKR Pocket Advance | 内置 0730、0813、0828 原版 boot；已完成 Root、恢复预检和 OTA 自动修补实机验证 | 字体、RGB、Play Integrity Fork、Shamiko、Dolby Atmos |
-| AYANEO Pocket AIR Mini | **测试功能，未进行真机 Root/恢复验证**；内置 1020、1027、1030、1103、1110、1125 原版 boot，OTA 链和镜像仅完成离线校验 | Play Integrity Fork、Shamiko（仅完成静态兼容性审查） |
+| KONKR Pocket Advance | 内置 0730、0813、0828 原版及 Magisk 30.7 修补 boot；已完成 Root、恢复预检和 OTA 自动修补实机验证 | 字体、RGB、Play Integrity Fork、Shamiko、Dolby Atmos |
+| AYANEO Pocket AIR Mini | **测试功能，未进行真机 Root/恢复验证**；内置 1020、1027、1030、1103、1110、1125 原版及 Magisk 30.7 修补 boot，OTA 链和镜像仅完成离线校验 | Play Integrity Fork、Shamiko（仅完成静态兼容性审查） |
 
-Root 使用 Magisk 30.7 + Zygisk。运行环境为 Windows，ADB、Fastboot 和 USB 驱动均已包含。Magisk boot 不预置，在 Root 时从对应原版 boot 自动生成并校验。
+Root 使用 Magisk 30.7 + Zygisk。运行环境为 Windows，ADB、Fastboot 和 USB 驱动均已包含。上述已知版本已内置原版及修补 boot，获取 Root 和恢复 boot 无需下载 OTA。后续未内置版本仍可通过官方增量 OTA 合成原版 boot，再自动修补；该流程需要联网和有效的连续增量链。
 
 脚本会在操作前检查设备型号、固件版本、活动槽、Bootloader 状态、镜像大小和 SHA-256。Root 与恢复只处理当前活动槽，用户不需要手动选择 A/B 槽。
 
@@ -62,7 +62,7 @@ Root 使用 Magisk 30.7 + Zygisk。运行环境为 Windows，ADB、Fastboot 和 
 
 脚本优先使用并校验已有镜像。当前固件缺少镜像时，才会查询和下载官方相邻增量 OTA，从已有原版 boot 逐版合成当前版本原版 boot，再用随包 Magisk 30.7 自动修补。完成预检和用户确认后，只刷入当前活动槽；随后安装 Magisk、开启 Zygisk，并验证 Root 状态。
 
-自动生成需要联网、有效的官方连续增量链以及正常的 ADB 连接。OTA 保留服务器原始文件名并缓存在对应机型的 `devices/<机型>/ota/cache`。已有原版 boot 不会被重新生成或覆盖。
+仅未内置版本的 OTA 合成需要联网、有效的官方连续增量链以及正常的 ADB 连接。OTA 保留服务器原始文件名并缓存在对应机型的 `devices/<机型>/ota/cache`。已有原版 boot 不会被重新生成或覆盖。
 
 预装模块由各机型的 `modules.psd1` 白名单决定。Pocket Advance 使用五个模块；AIR Mini 测试配置只选择 Play Integrity Fork 和 Shamiko，不会安装 KPA 专用的 RGB、字体或 Dolby 模块。AIR Mini 上的两个模块尚未经过真机运行验证。
 

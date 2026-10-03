@@ -4,6 +4,7 @@ param([Parameter(Mandatory)][string]$Version, [switch]$SkipModuleDownload)
 $ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Toolkit = Join-Path $ProjectRoot 'toolkit'
+. (Join-Path $ProjectRoot 'scripts/Prepare-BootAssets.ps1')
 $Dist = Join-Path $ProjectRoot 'dist'
 if (-not $SkipModuleDownload) { & (Join-Path $ProjectRoot 'scripts/Fetch-Modules.ps1') }
 
@@ -34,8 +35,9 @@ try {
         $OtaState = Join-Path $_.FullName 'ota'
         if (Test-Path -LiteralPath $OtaState) { Remove-Item -LiteralPath $OtaState -Recurse -Force }
     }
-    # Runtime-patched images are device-generated state and must never ship.
-    Get-ChildItem -LiteralPath (Join-Path $Stage 'devices') -Recurse -File -Filter 'boot_*_magisk_*.img' | Remove-Item -Force
+    # 已知版本原版与修补镜像均随包提供，并按机型目录表校验。
+    # Bundle and verify catalog stock/patched images for offline operation.
+    Initialize-KpaReleaseBootAssets (Join-Path $Stage 'devices/pocket-advance')
     Get-ChildItem -LiteralPath $Stage -File -Filter '*_Log_*.txt' | Remove-Item -Force
     $Profiles = @(Get-ChildItem -LiteralPath (Join-Path $Stage 'devices') -Directory)
     if ($Profiles.Count -ne 1 -or $Profiles[0].Name -ne 'pocket-advance') {
@@ -45,9 +47,6 @@ try {
     $Modules = @(Get-ChildItem -LiteralPath (Join-Path $Stage 'packages\modules') -File -Filter '*.zip' | Select-Object -ExpandProperty Name | Sort-Object)
     if (($Modules -join ',') -ne ($ExpectedModules -join ',')) {
         throw "Stable package contains unexpected modules: $($Modules -join ', ')"
-    }
-    if (Get-ChildItem -LiteralPath $Stage -Recurse -File -Filter 'boot_*_magisk_*.img') {
-        throw 'Prebuilt Magisk boot must not be included.'
     }
     $PackageFiles = Get-ChildItem -LiteralPath $Stage -Force
     Compress-Archive -LiteralPath $PackageFiles.FullName -DestinationPath $Output -CompressionLevel Optimal

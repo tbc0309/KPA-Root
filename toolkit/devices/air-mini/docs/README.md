@@ -49,7 +49,7 @@ The official server returned the following incremental chain. All downloaded arc
 
 The server returned no later incremental package after `20251110`. The `20251125` stock boot therefore comes directly from the later official full-flash package; it was not synthesized from the `20251110` boot.
 
-All six stock boot images are stored in `images/`. Magisk hashes remain empty until the images are patched by the bundled Magisk 30.7 pipeline on an Android patch host; a Windows-only patcher was deliberately not accepted as equivalent without matching the known KPA reference output.
+All six stock boots and their Magisk 30.7 patched counterparts are bundled in `images/`, with SHA-256 hashes in `firmware.psd1` and `SHA256SUMS.txt`. Known builds need no OTA download for Root or restore. Patched images were generated on an Android patch host and checked for integrity; they have not been booted on AIR Mini hardware. Future unbundled builds still require a continuous official OTA chain and Internet access.
 
 The KPA and Pocket AIR Mini share board-level identifiers. Device selection must therefore also validate the serial and build prefixes; board/model alone are not unique.
 
